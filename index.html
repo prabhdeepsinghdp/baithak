@@ -382,7 +382,7 @@
 // ── AZURE / OAUTH CONFIG ──────────────────────────────────────
 const CLIENT_ID   = '92f67cdb-e383-4afc-b465-d898edf13975';
 const REDIRECT_URI= 'https://prabhdeepsinghdp.github.io/baithak/';
-const SCOPES      = 'Files.Read User.Read';
+const SCOPES      = 'Files.ReadWrite User.Read';
 const AUTH_URL    = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize';
 const TOKEN_URL   = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token';
 const GRAPH       = 'https://graph.microsoft.com/v1.0';
@@ -407,6 +407,7 @@ function saveTokens(data){
   localStorage.setItem('bt_token',data.access_token);
   localStorage.setItem('bt_expiry',exp);
   if(data.refresh_token) localStorage.setItem('bt_refresh',data.refresh_token);
+  if(data.scope) localStorage.setItem('bt_scope',data.scope);
   accessToken=data.access_token; tokenExpiry=exp;
 }
 function loadTokens(){
@@ -474,6 +475,13 @@ function showSignin(){
 }
 
 async function launch(){
+  // If token was issued under old read-only scope, force re-auth for ReadWrite
+  const grantedScope = localStorage.getItem('bt_scope')||'';
+  if(!grantedScope.includes('ReadWrite')){
+    clearTokens();
+    showSignin();
+    return;
+  }
   document.getElementById('signinScreen').classList.add('hidden');
   document.getElementById('mainApp').style.display='flex';
   buildEQ();tick();setInterval(tick,30000);
@@ -497,7 +505,8 @@ async function fetchFolder(link){
   if(link.includes('1drv.ms/s/'))
     throw new Error('This is a file link (/s/…). Right-click the folder itself to share — the link should contain /f/.');
   const enc=btoa(link).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-  const data=await gFetch(GRAPH+'/shares/u!'+enc+'/root/children?$select=name,size,file,@microsoft.graph.downloadUrl');
+  // Request id so we can fetch a fresh download URL at play time — downloadUrl expires quickly
+  const data=await gFetch(GRAPH+'/shares/u!'+enc+'/root/children?$select=name,size,id,file');
   const files=(data.value||[])
     .filter(f=>f.file&&/\.(mp3|flac|m4a|aac|wav|ogg)$/i.test(f.name))
     .sort((a,b)=>a.name.localeCompare(b.name));
@@ -507,8 +516,14 @@ async function fetchFolder(link){
     a:'',
     dur:f.size?Math.round(f.size/32000):200,
     fmt:f.name.split('.').pop().toUpperCase(),
-    url:f['@microsoft.graph.downloadUrl']||null,
+    itemId:f.id,   // store item ID, fetch fresh URL at play time
   }));
+}
+
+// Fetch a fresh, non-expired download URL for a file by its Graph item ID
+async function getDownloadUrl(itemId){
+  const data=await gFetch(GRAPH+'/me/drive/items/'+itemId+'?$select=@microsoft.graph.downloadUrl,id');
+  return data['@microsoft.graph.downloadUrl']||null;
 }
 
 // ── MOODS ─────────────────────────────────────────────────────
@@ -695,7 +710,7 @@ function renderTL(){
 function playAll(){if(!activeGroup||!activeGroup.tracks.length)return;play(0);goNP();}
 
 // ── PLAYBACK ──────────────────────────────────────────────────
-function play(idx){
+async function play(idx){
   if(!activeGroup)return;
   stopTick();activeIdx=idx;elapsed=0;
   const t=activeGroup.tracks[idx];
@@ -707,21 +722,26 @@ function play(idx){
   document.getElementById('tCur').textContent='0:00';
   document.getElementById('progFg').style.width='0%';
   document.getElementById('npMood').innerHTML='<div class="mood-pill" style="background:'+m.bg+';color:'+m.color+';border-color:'+m.bc+'"><i class="ti ti-circle-dot" style="font-size:10px;"></i>'+m.label+'</div>';
-  if(t.url){
-    if(aud){aud.pause();aud=null;}
-    aud=new Audio(t.url);
-    aud.volume=document.getElementById('volR').value/100;
-    aud.play().catch(()=>{});
-    aud.addEventListener('timeupdate',()=>{
-      if(!aud)return;
-      elapsed=Math.floor(aud.currentTime);
-      document.getElementById('tCur').textContent=fmtT(elapsed);
-      document.getElementById('progFg').style.width=Math.min(100,Math.round(aud.currentTime/aud.duration*100))+'%';
-      updateMini();
-    });
-    aud.addEventListener('ended',()=>{repeat?nextTrack():stopPlay();});
-  }
   renderTL();startPlay();
+  // Fetch a fresh download URL using the stored item ID
+  if(t.itemId){
+    try{
+      const url=await getDownloadUrl(t.itemId);
+      if(!url)return;
+      if(aud){aud.pause();aud=null;}
+      aud=new Audio(url);
+      aud.volume=document.getElementById('volR').value/100;
+      aud.play().catch(e=>console.warn('Audio play failed:',e));
+      aud.addEventListener('timeupdate',()=>{
+        if(!aud)return;
+        elapsed=Math.floor(aud.currentTime);
+        document.getElementById('tCur').textContent=fmtT(elapsed);
+        document.getElementById('progFg').style.width=Math.min(100,Math.round(aud.currentTime/aud.duration*100))+'%';
+        updateMini();
+      });
+      aud.addEventListener('ended',()=>{repeat?nextTrack():stopPlay();});
+    }catch(e){console.warn('Could not fetch audio URL:',e);}
+  }
 }
 function startPlay(){
   playing=true;document.getElementById('playIco').className='ti ti-player-pause';
