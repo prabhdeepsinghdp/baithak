@@ -337,6 +337,9 @@
     </div>
   </div>
 
+  <!-- HIDDEN AUDIO ELEMENT -->
+  <audio id="mainAudio" preload="none" style="display:none"></audio>
+
   <!-- SYNC BAR -->
   <div id="syncBar" style="display:flex;align-items:center;gap:8px;padding:5px 20px;background:var(--panel);border-top:1px solid var(--border2);flex-shrink:0;">
     <div class="sync-dot synced" id="syncDot" style="width:6px;height:6px;border-radius:50%;background:#4a9;flex-shrink:0;transition:background 0.3s;"></div>
@@ -503,10 +506,9 @@ async function fetchFolder(link){
   if(!link.includes('1drv.ms')&&!link.includes('onedrive.live.com')&&!link.includes('sharepoint.com'))
     throw new Error('This does not look like a OneDrive link.');
   if(link.includes('1drv.ms/s/'))
-    throw new Error('This is a file link (/s/…). Right-click the folder itself to share — the link should contain /f/.');
+    throw new Error('This is a file link (/s/\u2026). Right-click the folder itself \u2014 the link should contain /f/.');
   const enc=btoa(link).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-  // Request id so we can fetch a fresh download URL at play time — downloadUrl expires quickly
-  const data=await gFetch(GRAPH+'/shares/u!'+enc+'/root/children?$select=name,size,id,file');
+  const data=await gFetch(GRAPH+'/shares/u!'+enc+'/root/children?$select=name,size,id,file,@microsoft.graph.downloadUrl');
   const files=(data.value||[])
     .filter(f=>f.file&&/\.(mp3|flac|m4a|aac|wav|ogg)$/i.test(f.name))
     .sort((a,b)=>a.name.localeCompare(b.name));
@@ -516,19 +518,29 @@ async function fetchFolder(link){
     a:'',
     dur:f.size?Math.round(f.size/32000):200,
     fmt:f.name.split('.').pop().toUpperCase(),
-    itemId:f.id,   // store item ID, fetch fresh URL at play time
+    itemId:f.id,
+    fileName:f.name,
   }));
 }
 
-// Fetch a fresh, non-expired download URL for a file by its Graph item ID
-async function getStreamUrl(itemId){
-  // Fetch a fresh downloadUrl via Graph — same approach as cinema app
-  // downloadUrl supports range requests so browser streams it natively, no buffering wait
+// Resolve a fresh streaming URL — mirrors cinema app's /shares/driveItem approach
+async function getStreamUrl(itemId, fileName, folderLink){
+  // Primary: resolve file through its parent folder share link (same as cinema app)
+  if(folderLink && fileName){
+    try{
+      const enc=btoa(folderLink).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+      const data=await gFetch(GRAPH+'/shares/u!'+enc+'/root:/'+encodeURIComponent(fileName)+':/driveItem');
+      const url=data['@microsoft.graph.downloadUrl'];
+      if(url) return url;
+    }catch(e){console.warn('folder resolve failed, falling back to itemId:',e);}
+  }
+  // Fallback: resolve directly via item ID
   const data=await gFetch(GRAPH+'/me/drive/items/'+itemId+'?$select=@microsoft.graph.downloadUrl,id');
   const url=data['@microsoft.graph.downloadUrl'];
-  if(!url) throw new Error('No download URL returned');
+  if(!url) throw new Error('No download URL');
   return url;
 }
+
 
 // ── MOODS ─────────────────────────────────────────────────────
 const MOODS={
@@ -591,7 +603,8 @@ function debounceSave(){clearTimeout(syncTimer);syncTimer=setTimeout(saveLib,150
 const lib={films:[],artists:[],mood:[]};
 let tab='films',activeGroup=null,activeIdx=-1;
 let playing=false,shuffle=true,repeat=true,elapsed=0;
-let ticker=null,eqTicker=null,eqBars=[],aud=null;
+let ticker=null,eqTicker=null,eqBars=[];
+let aud=null; // points to document.getElementById('mainAudio')
 let sCat='films',sMood='chill';
 
 function rebuildMood(){
@@ -731,32 +744,42 @@ async function play(idx){
   if(t.itemId){
     try{
       setSyncStatus('syncing','Loading…');
-      const streamUrl=await getStreamUrl(t.itemId);
-      if(aud){aud.pause();aud=null;}
-      aud=new Audio();
-      aud.volume=document.getElementById('volR').value/100;
-      aud.src=streamUrl;  // set src directly — browser streams with range requests, instant start
+      const streamUrl=await getStreamUrl(t.itemId, t.fileName, activeGroup.link);
+      // Use the persistent DOM <audio> element — same pattern as cinema app's <video>
+      // This avoids CORS preflight that dynamically created Audio() objects trigger
+      aud=document.getElementById('mainAudio');
+      aud.pause();
+      aud.removeAttribute('src');
       aud.load();
-      // On iOS a user gesture is required — play() on load event satisfies it
+      aud.volume=document.getElementById('volR').value/100;
+      aud.src=streamUrl;
+      aud.load();
+      // Remove old listeners by cloning
+      const fresh=aud.cloneNode(false);
+      aud.parentNode.replaceChild(fresh,aud);
+      aud=fresh;
+      aud.src=streamUrl;
+      aud.volume=document.getElementById('volR').value/100;
       aud.addEventListener('canplay',()=>{
-        aud.play().catch(e=>console.warn('play()failed:',e));
+        aud.play().catch(e=>console.warn('play failed:',e));
         setSyncStatus('synced','Playing');
       },{once:true});
       aud.addEventListener('timeupdate',()=>{
-        if(!aud)return;
+        if(!aud||isNaN(aud.duration))return;
         elapsed=Math.floor(aud.currentTime);
         document.getElementById('tCur').textContent=fmtT(elapsed);
         document.getElementById('progFg').style.width=Math.min(100,Math.round(aud.currentTime/aud.duration*100))+'%';
         updateMini();
       });
       aud.addEventListener('ended',()=>{repeat?nextTrack():stopPlay();});
-      aud.addEventListener('error',e=>{
-        setSyncStatus('error','Audio error — check console');
-        console.warn('Audio element error:',aud.error);
+      aud.addEventListener('error',()=>{
+        console.warn('Audio error code:',aud.error&&aud.error.code,'msg:',aud.error&&aud.error.message);
+        setSyncStatus('error','Could not play — check OneDrive link permissions');
       });
+      aud.load();
     }catch(e){
       setSyncStatus('error','Could not load audio');
-      console.warn('Audio error:',e);
+      console.warn('Audio fetch error:',e);
     }
   }
 }
@@ -776,13 +799,13 @@ function startPlay(){
 }
 function stopPlay(){
   playing=false;document.getElementById('playIco').className='ti ti-player-play';
-  if(aud){aud.pause();aud=null;}
+  if(aud){aud.pause();}
   stopTick();animEQ();updateMini();
 }
 function stopTick(){if(ticker){clearInterval(ticker);ticker=null;}if(eqTicker){clearInterval(eqTicker);eqTicker=null;}}
 function togglePlay(){
   if(!activeGroup||activeIdx<0){if(activeGroup&&activeGroup.tracks.length)play(0);return;}
-  playing?stopPlay():(aud&&aud.paused&&aud.play().catch(()=>{}),startPlay());
+  playing?stopPlay():(aud&&aud.src&&aud.paused?aud.play().catch(()=>{}):null,startPlay());
 }
 function nextTrack(){if(!activeGroup)return;const l=activeGroup.tracks.length;play(shuffle?Math.floor(Math.random()*l):(activeIdx+1)%l);}
 function prevTrack(){if(!activeGroup)return;if(elapsed>4){elapsed=0;if(aud)aud.currentTime=0;return;}play((activeIdx-1+activeGroup.tracks.length)%activeGroup.tracks.length);}
