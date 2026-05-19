@@ -8,8 +8,9 @@
   <meta name="apple-mobile-web-app-title" content="बैठक" />
   <meta name="theme-color" content="#0f0a14" />
   <title>बैठक</title>
+  <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Serif+Devanagari:wght@900&family=Syne:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Serif+Devanagari:wght@400;700;900&family=Syne:wght@400;500;700&display=swap" rel="stylesheet" />
   <style>
     :root{
       --bg:#0f0a14;--panel:#160e1e;--card:#1e1428;--raised:#251832;
@@ -28,7 +29,7 @@
     .signin-screen.hidden{display:none;}
     .signin-card{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:40px 32px;width:100%;max-width:340px;text-align:center;}
     .signin-arch{height:3px;border-radius:2px;margin-bottom:28px;background:repeating-linear-gradient(90deg,var(--saffron) 0,var(--saffron) 10px,var(--terracotta) 10px,var(--terracotta) 20px,var(--marigold) 20px,var(--marigold) 30px,var(--indigo2) 30px,var(--indigo2) 40px);}
-    .signin-wordmark{font-family:var(--deva);font-size:36px;font-weight:900;color:var(--text);margin-bottom:6px;}
+    .signin-wordmark{font-family:var(--deva);font-size:36px;font-weight:900;color:var(--text);margin-bottom:6px;line-height:1.4;letter-spacing:0.02em;}
     .signin-wordmark span{color:var(--terracotta);}
     .signin-tagline{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.18em;text-transform:uppercase;margin-bottom:36px;}
     .signin-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:'Syne',sans-serif;font-size:14px;font-weight:500;padding:14px;cursor:pointer;transition:all 0.15s;}
@@ -183,6 +184,10 @@
     .empty-sub{font-family:var(--mono);font-size:10px;color:var(--subtle);line-height:1.9;}
     .spin{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--saffron);border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px;}
     @keyframes spin{to{transform:rotate(360deg);}}
+    .sync-dot.syncing{background:var(--saffron);animation:pulse 1s infinite;}
+    .sync-dot.synced{background:#4a9;}
+    .sync-dot.error{background:#c44;}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
   </style>
 </head>
 <body>
@@ -191,7 +196,23 @@
 <div class="signin-screen" id="signinScreen">
   <div class="signin-card">
     <div class="signin-arch"></div>
-    <div class="signin-wordmark"><span>ब</span>ैठक</div>
+    <div style="margin-bottom:20px;">
+      <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto 16px;" role="img" aria-label="Baithak icon">
+        <rect width="120" height="120" rx="28" fill="#1e1428"/>
+        <rect x="16" y="16" width="88" height="4" rx="2" fill="url(#arch)"/>
+        <defs>
+          <linearGradient id="arch" x1="16" y1="18" x2="104" y2="18" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#E8850A"/>
+            <stop offset="33%" stop-color="#C4522A"/>
+            <stop offset="66%" stop-color="#D4920A"/>
+            <stop offset="100%" stop-color="#3d2568"/>
+          </linearGradient>
+        </defs>
+        <text x="60" y="88" text-anchor="middle" font-family="'Noto Serif Devanagari', serif" font-size="52" font-weight="900" fill="#f2e8d8" letter-spacing="1">बैठक</text>
+        <text x="23" y="88" text-anchor="middle" font-family="'Noto Serif Devanagari', serif" font-size="52" font-weight="900" fill="#C4522A">ब</text>
+      </svg>
+      <div class="signin-wordmark" style="font-size:28px;margin-bottom:4px;"><span>ब</span>ैठक</div>
+    </div>
     <div class="signin-tagline">Your personal music</div>
     <button class="signin-btn" onclick="signIn()">
       <svg width="18" height="18" viewBox="0 0 21 21" fill="none">
@@ -314,6 +335,12 @@
       <button class="nav-btn active" onclick="goLib()"><i class="ti ti-music"></i>Library</button>
       <button class="nav-btn" onclick="goSearch()"><i class="ti ti-search"></i>Search</button>
     </div>
+  </div>
+
+  <!-- SYNC BAR -->
+  <div id="syncBar" style="display:flex;align-items:center;gap:8px;padding:5px 20px;background:var(--panel);border-top:1px solid var(--border2);flex-shrink:0;">
+    <div class="sync-dot synced" id="syncDot" style="width:6px;height:6px;border-radius:50%;background:#4a9;flex-shrink:0;transition:background 0.3s;"></div>
+    <span id="syncTxt" style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:0.06em;flex:1;">Ready</span>
   </div>
 </div>
 
@@ -438,7 +465,6 @@ async function refreshToken(){
 
 function signOut(){
   clearTokens();
-  localStorage.removeItem('baithak_v1');
   window.location.href='https://login.microsoftonline.com/consumers/oauth2/v2.0/logout?post_logout_redirect_uri='+encodeURIComponent(REDIRECT_URI);
 }
 
@@ -447,10 +473,13 @@ function showSignin(){
   document.getElementById('mainApp').style.display='none';
 }
 
-function launch(){
+async function launch(){
   document.getElementById('signinScreen').classList.add('hidden');
   document.getElementById('mainApp').style.display='flex';
-  buildEQ();loadLib();renderGroups();tick();setInterval(tick,30000);
+  buildEQ();tick();setInterval(tick,30000);
+  setSyncStatus('syncing','Loading your library…');
+  await loadLib();
+  renderGroups();
 }
 
 // ── GRAPH API CALL ────────────────────────────────────────────
@@ -491,13 +520,53 @@ const MOODS={
   focus: {label:'Focus', color:'#4a8FD5',bg:'rgba(42,95,168,0.18)', bc:'rgba(42,95,168,0.38)' },
 };
 
-// ── STORAGE ───────────────────────────────────────────────────
-function saveLib(){ localStorage.setItem('baithak_v1',JSON.stringify({films:lib.films,artists:lib.artists})); }
-function loadLib(){
-  try{const s=JSON.parse(localStorage.getItem('baithak_v1')||'{}');lib.films=s.films||[];lib.artists=s.artists||[];}
-  catch(e){lib.films=[];lib.artists=[];}
+// ── ONEDRIVE LIBRARY SYNC ────────────────────────────────────────────────────
+const LIBRARY_FILE = 'baithak-library.json';
+let syncTimer = null;
+
+function setSyncStatus(state, text){
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncTxt');
+  if(!dot||!txt) return;
+  dot.className = 'sync-dot '+state;
+  txt.textContent = text;
+}
+
+async function loadLib(){
+  try{
+    await refreshToken();
+    const r = await fetch(GRAPH+'/me/drive/root:/'+LIBRARY_FILE+':/content',
+      {headers:{Authorization:'Bearer '+accessToken}});
+    if(r.status===404){lib.films=[];lib.artists=[];setSyncStatus('synced','New library — ready');}
+    else if(!r.ok){throw new Error(r.status);}
+    else{
+      const data=await r.json();
+      lib.films=data.films||[];lib.artists=data.artists||[];
+      setSyncStatus('synced','Loaded · '+(lib.films.length+lib.artists.length)+' collections');
+    }
+  }catch(e){setSyncStatus('error','Could not load library');lib.films=[];lib.artists=[];}
   rebuildMood();
 }
+
+async function saveLib(){
+  setSyncStatus('syncing','Saving…');
+  try{
+    await refreshToken();
+    const r=await fetch(GRAPH+'/me/drive/root:/'+LIBRARY_FILE+':/content',{
+      method:'PUT',
+      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify({films:lib.films,artists:lib.artists},null,2)
+    });
+    if(!r.ok) throw new Error(r.status);
+    const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    setSyncStatus('synced','Saved · '+t);
+  }catch(e){
+    setSyncStatus('error','Save failed — retrying…');
+    clearTimeout(syncTimer);syncTimer=setTimeout(saveLib,8000);
+  }
+}
+
+function debounceSave(){clearTimeout(syncTimer);syncTimer=setTimeout(saveLib,1500);}
 
 // ── STATE ─────────────────────────────────────────────────────
 const lib={films:[],artists:[],mood:[]};
@@ -600,7 +669,7 @@ function del(id){
   lib.films=lib.films.filter(g=>g.id!==id);
   lib.artists=lib.artists.filter(g=>g.id!==id);
   if(activeGroup&&activeGroup.id===id){activeGroup=null;activeIdx=-1;}
-  rebuildMood();saveLib();renderGroups();
+  rebuildMood();debounceSave();renderGroups();
 }
 function openGroup(id){
   const items=tab==='mood'?lib.mood:tab==='films'?lib.films:lib.artists;
@@ -742,7 +811,7 @@ async function addEntry(){
   try{
     const tracks=await fetchFolder(link);
     lib[sCat].push({id:name+'_'+Date.now(),name,mood:sMood,link,tracks});
-    rebuildMood();saveLib();
+    rebuildMood();debounceSave();
     st.className='fetch-status success';
     st.textContent='✓ Found '+tracks.length+' track'+(tracks.length!==1?'s':'')+'. Added to '+(sCat==='films'?'Films':'Artists')+'.';
     setTimeout(()=>{closeSheet();renderGroups();},1400);
@@ -783,6 +852,14 @@ async function init(){
 }
 
 init();
+
+// ── SERVICE WORKER ────────────────────────────────────────────
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/baithak/sw.js')
+      .catch(e => console.warn('SW registration failed:', e));
+  });
+}
 </script>
 </body>
 </html>
