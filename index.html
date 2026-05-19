@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="बैठक" />
+  <meta name="theme-color" content="#0f0a14" />
+  <title>बैठक</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Serif+Devanagari:wght@900&family=Syne:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --bg:#0f0a14;--panel:#160e1e;--card:#1e1428;--raised:#251832;
+      --border:rgba(180,120,60,0.18);--border2:rgba(180,120,60,0.08);--indigo2:#3d2568;
+      --saffron:#E8850A;--saffron2:#c46a00;--saffron-dim:rgba(232,133,10,0.14);
+      --terracotta:#C4522A;--terra-dim:rgba(196,82,42,0.15);
+      --jade:#2E7D5E;--jade-dim:rgba(46,125,94,0.15);--marigold:#D4920A;
+      --text:#f2e8d8;--muted:rgba(242,232,216,0.45);--subtle:rgba(242,232,216,0.18);
+      --mono:'Share Tech Mono',monospace;--deva:'Noto Serif Devanagari',serif;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+    html,body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;height:100%;overflow:hidden;position:fixed;width:100%;}
+    .app{display:flex;flex-direction:column;height:100%;max-width:480px;margin:0 auto;overflow:hidden;}
+    .arch-bar{height:4px;flex-shrink:0;background:repeating-linear-gradient(90deg,var(--saffron) 0,var(--saffron) 12px,var(--terracotta) 12px,var(--terracotta) 24px,var(--marigold) 24px,var(--marigold) 36px,var(--indigo2) 36px,var(--indigo2) 48px);}
+    .screen{display:none;flex-direction:column;flex:1;overflow:hidden;}
+    .screen.active{display:flex;}
+    .scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+    .scroll-area::-webkit-scrollbar{display:none;}
+    .sbar{display:flex;justify-content:space-between;align-items:center;padding:10px 20px 4px;flex-shrink:0;}
+    .sbar-time{font-family:var(--mono);font-size:11px;color:var(--muted);}
+    .sbar-icons{display:flex;gap:6px;}
+    .sbar-icons i{font-size:13px;color:var(--muted);}
+    .bottom-nav{display:flex;border-top:1px solid var(--border);background:var(--panel);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0px);}
+    .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:11px 0 13px;background:none;border:none;cursor:pointer;color:var(--muted);font-family:'Syne',sans-serif;font-size:9px;letter-spacing:0.06em;border-top:2px solid transparent;transition:all 0.15s;}
+    .nav-btn i{font-size:20px;}
+    .nav-btn.active{color:var(--saffron);border-top-color:var(--saffron);}
+    .icon-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:8px;border-radius:50%;display:flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;}
+    .icon-btn:active{background:rgba(255,255,255,0.05);}
+
+    /* NOW PLAYING */
+    .np-topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 20px 0;flex-shrink:0;}
+    .np-label{font-family:var(--mono);font-size:9px;letter-spacing:0.22em;color:var(--muted);text-transform:uppercase;}
+    .art-block{margin:14px 20px 18px;border-radius:16px;background:var(--card);border:1px solid rgba(180,120,60,0.25);height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;position:relative;overflow:hidden;flex-shrink:0;}
+    .art-block::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(135deg,rgba(180,120,60,0.03) 0,rgba(180,120,60,0.03) 1px,transparent 1px,transparent 12px);pointer-events:none;}
+    .art-jaali{position:absolute;top:0;left:0;right:0;height:5px;background:repeating-linear-gradient(90deg,var(--terracotta) 0,var(--terracotta) 6px,var(--saffron) 6px,var(--saffron) 12px,var(--jade) 12px,var(--jade) 18px,var(--indigo2) 18px,var(--indigo2) 24px);}
+    .art-eq{position:absolute;bottom:0;left:0;right:0;height:44px;display:flex;align-items:flex-end;gap:2px;padding:0 10px 5px;}
+    .art-bar{flex:1;border-radius:1px 1px 0 0;min-height:2px;background:var(--saffron2);opacity:0.55;}
+    .art-icon{font-size:52px;color:rgba(180,120,60,0.35);}
+    .art-fmt{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:0.1em;padding:3px 8px;border:1px solid var(--border);border-radius:3px;background:rgba(0,0,0,0.4);}
+    .track-info{padding:0 22px;margin-bottom:16px;flex-shrink:0;}
+    .track-title{font-size:20px;font-weight:700;line-height:1.2;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .track-artist{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .mood-pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;letter-spacing:0.1em;padding:4px 10px;border-radius:20px;margin-top:8px;border:1px solid;}
+    .prog-area{padding:0 22px;margin-bottom:18px;flex-shrink:0;}
+    .prog-bg{height:3px;background:rgba(255,255,255,0.07);border-radius:2px;cursor:pointer;margin-bottom:6px;}
+    .prog-fg{height:3px;background:var(--saffron);border-radius:2px;width:0%;transition:width 0.5s linear;}
+    .prog-times{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--subtle);}
+    .controls{display:flex;align-items:center;justify-content:space-between;padding:0 14px;margin-bottom:16px;flex-shrink:0;}
+    .ctrl-sm{background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;padding:10px;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;}
+    .ctrl-sm:active{background:rgba(255,255,255,0.05);}
+    .ctrl-sm.on{color:var(--saffron);}
+    .play-big{width:64px;height:64px;background:var(--terracotta);border:none;border-radius:50%;color:#fff8f0;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.1s;position:relative;}
+    .play-big::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1.5px solid rgba(196,82,42,0.35);}
+    .play-big:active{transform:scale(0.93);}
+    .vol-row{display:flex;align-items:center;gap:12px;padding:0 22px;margin-bottom:18px;flex-shrink:0;}
+    .vol-row i{font-size:16px;color:var(--subtle);}
+    .vol-track{flex:1;height:3px;background:rgba(255,255,255,0.07);border-radius:2px;position:relative;}
+    .vol-fill{height:3px;background:var(--marigold);border-radius:2px;width:70%;pointer-events:none;}
+    input.vol-r{position:absolute;inset:-14px 0;width:100%;height:32px;background:transparent;border:none;outline:none;cursor:pointer;-webkit-appearance:none;}
+
+    /* LIBRARY */
+    .lib-topbar{padding:10px 20px 10px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+    .lib-wordmark{font-family:var(--deva);font-size:26px;font-weight:900;line-height:1;color:var(--text);}
+    .lib-wordmark span{color:var(--terracotta);}
+    .search-pill{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:22px;padding:9px 16px;margin:0 20px 14px;flex-shrink:0;}
+    .search-pill i{font-size:14px;color:var(--muted);}
+    .search-pill input{background:none;border:none;outline:none;color:var(--text);font-size:13px;font-family:'Syne',sans-serif;flex:1;}
+    .search-pill input::placeholder{color:var(--subtle);}
+    .search-clear{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0;display:none;}
+    .browse-tabs{display:flex;margin:0 20px 14px;background:var(--card);border-radius:10px;padding:3px;gap:2px;border:1px solid var(--border2);flex-shrink:0;}
+    .btab{flex:1;padding:9px 0;font-size:11px;font-family:var(--mono);letter-spacing:0.1em;color:var(--muted);background:none;border:none;cursor:pointer;border-radius:8px;transition:all 0.15s;}
+    .btab.active{background:var(--terracotta);color:#fff8f0;font-weight:700;}
+    .group-list{padding:0 16px 16px;display:flex;flex-direction:column;gap:8px;}
+    .gcard{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all 0.12s;}
+    .gcard:active{background:var(--raised);}
+    .gcard.active-g{border-color:rgba(180,120,60,0.45);background:var(--raised);}
+    .gcard-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+    .gcard-info{flex:1;min-width:0;}
+    .gcard-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .gcard.active-g .gcard-name{color:var(--saffron);}
+    .gcard-meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px;}
+    .gcard-del{background:none;border:none;color:var(--subtle);cursor:pointer;font-size:16px;padding:8px;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;}
+    .gcard-del:active{color:#C4522A;background:rgba(196,82,42,0.1);}
+    .gcard-arrow{font-size:16px;color:var(--subtle);}
+
+    /* TRACK LIST */
+    .tl-topbar{display:flex;align-items:center;gap:8px;padding:8px 20px 10px;flex-shrink:0;}
+    .tl-back{background:none;border:none;color:var(--saffron);font-size:20px;cursor:pointer;min-width:44px;min-height:44px;display:flex;align-items:center;padding:0;}
+    .tl-heading{flex:1;min-width:0;}
+    .tl-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .tl-path{font-family:var(--mono);font-size:9px;color:var(--subtle);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .tl-divider{height:3px;margin:0 20px 14px;border-radius:2px;flex-shrink:0;background:repeating-linear-gradient(90deg,var(--terracotta) 0,var(--terracotta) 8px,var(--saffron) 8px,var(--saffron) 16px,var(--jade) 16px,var(--jade) 24px,var(--indigo2) 24px,var(--indigo2) 32px);}
+    .play-all-btn{margin:0 20px 14px;background:var(--terra-dim);border:1px solid rgba(196,82,42,0.3);border-radius:12px;padding:13px 16px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;color:var(--terracotta);font-size:13px;font-weight:600;flex-shrink:0;}
+    .play-all-btn:active{background:rgba(196,82,42,0.2);}
+    .track-list{padding:0 16px 16px;display:flex;flex-direction:column;gap:2px;}
+    .trow{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:10px;cursor:pointer;transition:background 0.1s;border:1px solid transparent;}
+    .trow:active{background:var(--card);}
+    .trow.active-t{background:var(--saffron-dim);border-color:var(--border);}
+    .trow-num{font-family:var(--mono);font-size:10px;color:var(--subtle);min-width:18px;text-align:right;}
+    .trow.active-t .trow-num{color:var(--saffron);}
+    .trow-info{flex:1;min-width:0;}
+    .trow-title{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .trow.active-t .trow-title{color:var(--saffron);}
+    .trow-artist{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .trow-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+    .trow-fmt{font-family:var(--mono);font-size:9px;padding:2px 6px;border:1px solid rgba(46,125,94,0.35);border-radius:3px;color:var(--jade);}
+    .trow-dur{font-family:var(--mono);font-size:10px;color:var(--subtle);}
+
+    /* MINI PLAYER */
+    .miniplayer{margin:0 16px 12px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;display:none;align-items:center;gap:10px;cursor:pointer;flex-shrink:0;}
+    .miniplayer.visible{display:flex;}
+    .miniplayer:active{background:var(--raised);}
+    .mini-info{flex:1;min-width:0;}
+    .mini-title{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .mini-artist{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .mini-prog{height:2px;background:rgba(255,255,255,0.07);border-radius:1px;margin-top:6px;}
+    .mini-prog-fg{height:2px;background:var(--saffron);border-radius:1px;width:0%;transition:width 0.5s linear;}
+    .mini-play-btn{background:none;border:none;color:var(--saffron);font-size:22px;cursor:pointer;padding:4px;display:flex;align-items:center;min-width:44px;min-height:44px;justify-content:center;}
+
+    /* ADD SHEET */
+    .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;display:none;align-items:flex-end;justify-content:center;}
+    .sheet-overlay.open{display:flex;}
+    .sheet{background:var(--panel);border-radius:20px 20px 0 0;border-top:1px solid var(--border);width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding-bottom:env(safe-area-inset-bottom,20px);}
+    .sheet-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 0;}
+    .sheet-title{font-size:16px;font-weight:700;padding:16px 20px 4px;}
+    .sheet-sub{font-family:var(--mono);font-size:10px;color:var(--muted);padding:0 20px 16px;line-height:1.8;}
+    .sheet-hr{height:1px;background:var(--border2);margin:0 20px 18px;}
+    .field{margin:0 20px 16px;}
+    .field label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
+    .field input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px;font-family:'Syne',sans-serif;outline:none;transition:border-color 0.15s;}
+    .field input:focus{border-color:rgba(232,133,10,0.5);}
+    .field input::placeholder{color:var(--subtle);}
+    .row-label{font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:var(--muted);text-transform:uppercase;padding:0 20px;margin-bottom:8px;}
+    .cat-row{display:flex;gap:8px;padding:0 20px;margin-bottom:18px;}
+    .cat-btn{flex:1;padding:10px 0;font-size:11px;font-family:var(--mono);letter-spacing:0.08em;color:var(--muted);background:var(--card);border:1px solid var(--border2);cursor:pointer;border-radius:8px;transition:all 0.15s;}
+    .cat-btn.active{background:var(--terra-dim);border-color:rgba(196,82,42,0.4);color:var(--terracotta);font-weight:700;}
+    .mood-row{display:flex;gap:8px;padding:0 20px;margin-bottom:20px;flex-wrap:wrap;}
+    .mood-btn{padding:8px 14px;font-size:11px;font-family:var(--mono);letter-spacing:0.08em;color:var(--muted);background:var(--card);border:1px solid var(--border2);cursor:pointer;border-radius:20px;transition:all 0.12s;}
+    .fetch-status{margin:0 20px 16px;padding:12px 14px;border-radius:10px;font-family:var(--mono);font-size:11px;line-height:1.7;display:none;}
+    .fetch-status.loading{display:block;background:rgba(232,133,10,0.08);border:1px solid rgba(232,133,10,0.2);color:var(--saffron);}
+    .fetch-status.success{display:block;background:rgba(46,125,94,0.1);border:1px solid rgba(46,125,94,0.3);color:var(--jade);}
+    .fetch-status.error{display:block;background:rgba(196,82,42,0.1);border:1px solid rgba(196,82,42,0.3);color:var(--terracotta);}
+    .sheet-actions{display:flex;gap:10px;padding:0 20px 8px;}
+    .btn-cancel{flex:1;padding:14px;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--muted);font-size:14px;font-family:'Syne',sans-serif;cursor:pointer;}
+    .btn-cancel:active{background:var(--raised);}
+    .btn-add{flex:2;padding:14px;background:var(--terracotta);border:none;border-radius:12px;color:#fff8f0;font-size:14px;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer;transition:opacity 0.15s;}
+    .btn-add:active{opacity:0.85;}
+    .btn-add:disabled{opacity:0.38;cursor:not-allowed;}
+
+    /* EMPTY */
+    .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 24px;gap:12px;text-align:center;}
+    .empty-state i{font-size:36px;color:var(--subtle);}
+    .empty-title{font-size:14px;font-weight:500;color:var(--muted);}
+    .empty-sub{font-family:var(--mono);font-size:10px;color:var(--subtle);line-height:1.9;}
+    .spin{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--saffron);border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="arch-bar"></div>
+  <div class="sbar">
+    <span class="sbar-time" id="clockTime">9:41</span>
+    <div class="sbar-icons"><i class="ti ti-wifi"></i><i class="ti ti-battery-2"></i></div>
+  </div>
+
+  <!-- NOW PLAYING -->
+  <div class="screen active" id="scrNP">
+    <div class="np-topbar">
+      <span class="np-label">Now playing</span>
+      <button class="icon-btn" onclick="goLib()" aria-label="Library"><i class="ti ti-layout-list"></i></button>
+    </div>
+    <div class="art-block">
+      <div class="art-jaali"></div>
+      <i class="ti ti-music art-icon"></i>
+      <span class="art-fmt" id="artFmt">──</span>
+      <div class="art-eq" id="artEq"></div>
+    </div>
+    <div class="track-info">
+      <div class="track-title" id="npTitle">Nothing playing</div>
+      <div class="track-artist" id="npArtist">Open library to browse</div>
+      <div id="npMood"></div>
+    </div>
+    <div class="prog-area">
+      <div class="prog-bg" id="progBg" onclick="seek(event)"><div class="prog-fg" id="progFg"></div></div>
+      <div class="prog-times"><span id="tCur">0:00</span><span id="tTot">0:00</span></div>
+    </div>
+    <div class="controls">
+      <button class="ctrl-sm on" id="shufBtn" onclick="toggleShuffle()" aria-label="Shuffle"><i class="ti ti-arrows-shuffle"></i></button>
+      <button class="ctrl-sm" onclick="prevTrack()" aria-label="Previous"><i class="ti ti-player-skip-back"></i></button>
+      <button class="play-big" onclick="togglePlay()" aria-label="Play"><i class="ti ti-player-play" id="playIco"></i></button>
+      <button class="ctrl-sm" onclick="nextTrack()" aria-label="Next"><i class="ti ti-player-skip-forward"></i></button>
+      <button class="ctrl-sm on" id="repBtn" onclick="toggleRepeat()" aria-label="Repeat"><i class="ti ti-repeat"></i></button>
+    </div>
+    <div class="vol-row">
+      <i class="ti ti-volume-3"></i>
+      <div class="vol-track"><div class="vol-fill" id="volFill"></div><input type="range" class="vol-r" id="volR" min="0" max="100" value="70" step="1" oninput="setVol(this.value)" aria-label="Volume"/></div>
+      <i class="ti ti-volume"></i>
+    </div>
+    <div class="bottom-nav">
+      <button class="nav-btn active" onclick="goNP()"><i class="ti ti-player-play"></i>Playing</button>
+      <button class="nav-btn" onclick="goLib()"><i class="ti ti-music"></i>Library</button>
+      <button class="nav-btn" onclick="goSearch()"><i class="ti ti-search"></i>Search</button>
+    </div>
+  </div>
+
+  <!-- LIBRARY -->
+  <div class="screen" id="scrLib">
+    <div class="lib-topbar">
+      <div class="lib-wordmark"><span>ब</span>ैठक</div>
+      <button class="icon-btn" onclick="openSheet()" aria-label="Add album"><i class="ti ti-plus"></i></button>
+    </div>
+    <div class="miniplayer" id="miniLib" onclick="goNP()">
+      <div class="mini-info">
+        <div class="mini-title" id="mLibT">—</div>
+        <div class="mini-artist" id="mLibA">—</div>
+        <div class="mini-prog"><div class="mini-prog-fg" id="mLibP"></div></div>
+      </div>
+      <button class="mini-play-btn" onclick="event.stopPropagation();togglePlay()" aria-label="Play"><i class="ti ti-player-play" id="mLibI"></i></button>
+    </div>
+    <div class="search-pill">
+      <i class="ti ti-search"></i>
+      <input id="searchInp" placeholder="Songs, artists, films…" oninput="doSearch(this.value)"/>
+      <button class="search-clear" id="srchClr" onclick="clearSearch()" aria-label="Clear"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="browse-tabs">
+      <button class="btab active" onclick="switchTab('films',this)">Films</button>
+      <button class="btab" onclick="switchTab('artists',this)">Artists</button>
+      <button class="btab" onclick="switchTab('mood',this)">Mood</button>
+    </div>
+    <div class="scroll-area"><div class="group-list" id="groupList"></div></div>
+    <div class="bottom-nav">
+      <button class="nav-btn" onclick="goNP()"><i class="ti ti-player-play"></i>Playing</button>
+      <button class="nav-btn active" onclick="goLib()"><i class="ti ti-music"></i>Library</button>
+      <button class="nav-btn" onclick="goSearch()"><i class="ti ti-search"></i>Search</button>
+    </div>
+  </div>
+
+  <!-- TRACK LIST -->
+  <div class="screen" id="scrTL">
+    <div class="tl-topbar">
+      <button class="tl-back" onclick="goLib()" aria-label="Back"><i class="ti ti-arrow-left"></i></button>
+      <div class="tl-heading">
+        <div class="tl-name" id="tlName">—</div>
+        <div class="tl-path" id="tlPath">—</div>
+      </div>
+      <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;" id="tlDot"></div>
+    </div>
+    <div class="tl-divider"></div>
+    <div class="miniplayer" id="miniTL" onclick="goNP()">
+      <div class="mini-info">
+        <div class="mini-title" id="mTLT">—</div>
+        <div class="mini-artist" id="mTLA">—</div>
+        <div class="mini-prog"><div class="mini-prog-fg" id="mTLP"></div></div>
+      </div>
+      <button class="mini-play-btn" onclick="event.stopPropagation();togglePlay()" aria-label="Play"><i class="ti ti-player-play" id="mTLI"></i></button>
+    </div>
+    <div class="play-all-btn" onclick="playAll()"><i class="ti ti-player-play"></i>Play all · <span id="tlCount">0</span> tracks</div>
+    <div class="scroll-area"><div class="track-list" id="trackList"></div></div>
+    <div class="bottom-nav">
+      <button class="nav-btn" onclick="goNP()"><i class="ti ti-player-play"></i>Playing</button>
+      <button class="nav-btn active" onclick="goLib()"><i class="ti ti-music"></i>Library</button>
+      <button class="nav-btn" onclick="goSearch()"><i class="ti ti-search"></i>Search</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD SHEET -->
+<div class="sheet-overlay" id="sheetOverlay" onclick="overlayClick(event)">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Add to library</div>
+    <div class="sheet-sub">
+      1. On OneDrive, right-click your album folder<br>
+      2. Share → "Anyone with the link can view" → Copy link<br>
+      3. Paste it below and tap Fetch &amp; Add
+    </div>
+    <div class="sheet-hr"></div>
+
+    <div class="field">
+      <label>OneDrive folder link</label>
+      <input id="addLink" type="url" placeholder="https://1drv.ms/f/…" oninput="onLinkInput()"/>
+    </div>
+    <div class="field">
+      <label>Name</label>
+      <input id="addName" type="text" placeholder="e.g. Rockstar (2011) or Jagjit Singh"/>
+    </div>
+
+    <div class="row-label">Category</div>
+    <div class="cat-row">
+      <button class="cat-btn active" onclick="setCat('films',this)">Film</button>
+      <button class="cat-btn" onclick="setCat('artists',this)">Artist</button>
+    </div>
+
+    <div class="row-label">Mood</div>
+    <div class="mood-row" id="moodRow"></div>
+
+    <div class="fetch-status" id="fetchStatus"></div>
+    <div class="sheet-actions">
+      <button class="btn-cancel" onclick="closeSheet()">Cancel</button>
+      <button class="btn-add" id="btnAdd" onclick="addEntry()" disabled>Fetch &amp; Add</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const MOODS={
+  chill: {label:'Chill', color:'#8B70CC',bg:'rgba(107,79,168,0.2)', bc:'rgba(107,79,168,0.4)' },
+  party: {label:'Party', color:'#B8436A',bg:'rgba(184,67,106,0.18)',bc:'rgba(184,67,106,0.38)'},
+  travel:{label:'Travel',color:'#2E7D5E',bg:'rgba(46,125,94,0.18)', bc:'rgba(46,125,94,0.35)' },
+  gym:   {label:'Gym',   color:'#C4522A',bg:'rgba(196,82,42,0.18)', bc:'rgba(196,82,42,0.35)' },
+  focus: {label:'Focus', color:'#4a8FD5',bg:'rgba(42,95,168,0.18)', bc:'rgba(42,95,168,0.38)' },
+};
+
+// ── STORAGE ──────────────────────────────────────────────────
+function saveLib(){ localStorage.setItem('baithak_v1',JSON.stringify({films:lib.films,artists:lib.artists})); }
+function loadLib(){
+  try{
+    const s=JSON.parse(localStorage.getItem('baithak_v1')||'{}');
+    lib.films=s.films||[]; lib.artists=s.artists||[];
+  }catch(e){lib.films=[];lib.artists=[];}
+  rebuildMood();
+}
+
+// ── ONEDRIVE FETCH ───────────────────────────────────────────
+async function fetchFolder(link){
+  const enc=btoa(link).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const url=`https://api.onedrive.com/v1.0/shares/u!${enc}/root/children`;
+  const res=await fetch(url);
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const data=await res.json();
+  const files=(data.value||[])
+    .filter(f=>/\.(mp3|flac|m4a|aac|wav|ogg)$/i.test(f.name))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  if(!files.length) throw new Error('No audio files found. Check the folder has music and the link is set to Anyone can view.');
+  return files.map(f=>({
+    t:f.name.replace(/^\d+[\s\-_.]+/,'').replace(/\.[^.]+$/,''),
+    a:'',
+    dur:f.size?Math.round(f.size/32000):200,
+    fmt:f.name.split('.').pop().toUpperCase(),
+    url:f['@microsoft.graph.downloadUrl']||f['@content.downloadUrl']||null,
+  }));
+}
+
+// ── STATE ────────────────────────────────────────────────────
+const lib={films:[],artists:[],mood:[]};
+let tab='films',activeGroup=null,activeIdx=-1;
+let playing=false,shuffle=true,repeat=true,elapsed=0;
+let ticker=null,eqTicker=null,eqBars=[],aud=null;
+let sCat='films',sMood='chill';
+
+function rebuildMood(){
+  const by={};
+  for(const cat of['films','artists']) for(const g of lib[cat]){
+    if(!by[g.mood])by[g.mood]=[];
+    by[g.mood].push(...(g.tracks||[]));
+  }
+  lib.mood=Object.entries(MOODS).map(([k,m])=>({id:'m_'+k,name:m.label,mood:k,tracks:by[k]||[],path:'/Music'}));
+}
+
+// ── NAV ──────────────────────────────────────────────────────
+function fmtT(s){return Math.floor(s/60)+':'+(Math.floor(s%60)+'').padStart(2,'0');}
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const m={scrNP:0,scrLib:1,scrTL:1};
+  const i=m[id]??1;
+  document.querySelectorAll('#'+id+' .nav-btn').forEach((b,j)=>b.classList.toggle('active',j===i));
+  updateMini();
+}
+function goNP(){showScreen('scrNP');}
+function goLib(){renderGroups();showScreen('scrLib');}
+function goSearch(){showScreen('scrLib');setTimeout(()=>document.getElementById('searchInp').focus(),80);}
+
+// ── EQ ───────────────────────────────────────────────────────
+function buildEQ(){
+  const eq=document.getElementById('artEq');eq.innerHTML='';eqBars=[];
+  for(let i=0;i<30;i++){
+    const b=document.createElement('div');b.className='art-bar';
+    const h=Math.sin((i/30)*Math.PI)*28+4;b.style.height=h+'px';b.dataset.h=h;
+    eq.appendChild(b);eqBars.push(b);
+  }
+}
+function animEQ(){
+  if(eqTicker)clearInterval(eqTicker);
+  if(!playing){eqBars.forEach(b=>{b.style.height=b.dataset.h+'px';b.style.opacity='0.35';b.style.background='#c46a00';});return;}
+  eqTicker=setInterval(()=>{
+    eqBars.forEach(b=>{
+      const h=Math.max(2,Math.min(36,parseFloat(b.dataset.h)+(Math.random()-0.45)*18));
+      b.style.height=h+'px';b.style.opacity=h>20?'0.9':h>12?'0.65':'0.35';
+      b.style.background=h>22?'#E8850A':h>14?'#c46a00':'#8B4A20';
+    });
+  },90);
+}
+
+// ── MINI ─────────────────────────────────────────────────────
+function updateMini(){
+  const has=activeGroup&&activeIdx>=0;
+  document.getElementById('miniLib').classList.toggle('visible',has);
+  document.getElementById('miniTL').classList.toggle('visible',has);
+  if(!has)return;
+  const t=activeGroup.tracks[activeIdx];
+  const pct=Math.min(100,Math.round(elapsed/(t.dur||1)*100));
+  [['mLib','T','A','P','I'],['mTL','T','A','P','I']].forEach(([p,ti,ai,pi,ii])=>{
+    document.getElementById(p+ti).textContent=t.t;
+    document.getElementById(p+ai).textContent=t.a||activeGroup.name;
+    document.getElementById(p+pi).style.width=pct+'%';
+    document.getElementById(p+ii).className=playing?'ti ti-player-pause':'ti ti-player-play';
+  });
+}
+
+// ── LIBRARY ──────────────────────────────────────────────────
+function switchTab(t,el){
+  tab=t;
+  document.querySelectorAll('.btab').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderGroups();
+}
+function renderGroups(){
+  const items=tab==='mood'?lib.mood:tab==='films'?lib.films:lib.artists;
+  const q=document.getElementById('searchInp').value.toLowerCase().trim();
+  const list=q?items.filter(g=>g.name.toLowerCase().includes(q)||g.tracks.some(t=>t.t.toLowerCase().includes(q)||(t.a||'').toLowerCase().includes(q))):items;
+  const gl=document.getElementById('groupList');
+  if(!list.length){
+    const isEmpty=!lib.films.length&&!lib.artists.length&&tab!=='mood';
+    gl.innerHTML=isEmpty
+      ?`<div class="empty-state"><i class="ti ti-music"></i><div class="empty-title">Your library is empty</div><div class="empty-sub">Tap the + button to add your<br>first album or artist folder</div></div>`
+      :`<div class="empty-state"><i class="ti ti-search"></i><div class="empty-title">No results</div></div>`;
+    return;
+  }
+  gl.innerHTML=list.map(g=>{
+    const m=MOODS[g.mood]||MOODS.chill;
+    const isA=activeGroup&&activeGroup.id===g.id;
+    const del=tab!=='mood'?`<button class="gcard-del" onclick="event.stopPropagation();del('${g.id}')" aria-label="Remove"><i class="ti ti-trash"></i></button>`:'';
+    return `<div class="gcard${isA?' active-g':''}" onclick="openGroup('${g.id}')">
+      <div class="gcard-dot" style="background:${m.color}"></div>
+      <div class="gcard-info"><div class="gcard-name">${g.name}</div><div class="gcard-meta">${g.tracks.length} tracks · <span style="color:${m.color}">${m.label}</span></div></div>
+      ${del}<i class="ti ti-chevron-right gcard-arrow"></i>
+    </div>`;
+  }).join('');
+}
+function del(id){
+  lib.films=lib.films.filter(g=>g.id!==id);
+  lib.artists=lib.artists.filter(g=>g.id!==id);
+  if(activeGroup&&activeGroup.id===id){activeGroup=null;activeIdx=-1;}
+  rebuildMood();saveLib();renderGroups();
+}
+function openGroup(id){
+  const items=tab==='mood'?lib.mood:tab==='films'?lib.films:lib.artists;
+  activeGroup=items.find(g=>g.id===id)||null;
+  if(!activeGroup)return;
+  const m=MOODS[activeGroup.mood]||MOODS.chill;
+  document.getElementById('tlName').textContent=activeGroup.name;
+  document.getElementById('tlPath').textContent=activeGroup.link||'Mood playlist';
+  document.getElementById('tlDot').style.background=m.color;
+  document.getElementById('tlCount').textContent=activeGroup.tracks.length;
+  renderTL();showScreen('scrTL');
+}
+function renderTL(){
+  if(!activeGroup)return;
+  document.getElementById('trackList').innerHTML=activeGroup.tracks.map((t,i)=>
+    `<div class="trow${activeIdx===i?' active-t':''}" onclick="play(${i})">
+      <span class="trow-num">${String(i+1).padStart(2,'0')}</span>
+      <div class="trow-info"><div class="trow-title">${t.t}</div><div class="trow-artist">${t.a||activeGroup.name}</div></div>
+      <div class="trow-right"><span class="trow-fmt">${t.fmt}</span><span class="trow-dur">${fmtT(t.dur)}</span></div>
+    </div>`
+  ).join('');
+}
+function playAll(){if(!activeGroup||!activeGroup.tracks.length)return;play(0);goNP();}
+
+// ── PLAYBACK ─────────────────────────────────────────────────
+function play(idx){
+  if(!activeGroup)return;
+  stopTick();activeIdx=idx;elapsed=0;
+  const t=activeGroup.tracks[idx];
+  const m=MOODS[activeGroup.mood]||MOODS.chill;
+  document.getElementById('npTitle').textContent=t.t;
+  document.getElementById('npArtist').textContent=t.a||activeGroup.name;
+  document.getElementById('artFmt').textContent=t.fmt;
+  document.getElementById('tTot').textContent=fmtT(t.dur);
+  document.getElementById('tCur').textContent='0:00';
+  document.getElementById('progFg').style.width='0%';
+  document.getElementById('npMood').innerHTML=`<div class="mood-pill" style="background:${m.bg};color:${m.color};border-color:${m.bc}"><i class="ti ti-circle-dot" style="font-size:10px;"></i>${m.label}</div>`;
+  if(t.url){
+    if(aud){aud.pause();aud=null;}
+    aud=new Audio(t.url);
+    aud.volume=document.getElementById('volR').value/100;
+    aud.play().catch(()=>{});
+    aud.addEventListener('timeupdate',()=>{
+      if(!aud)return;
+      elapsed=Math.floor(aud.currentTime);
+      document.getElementById('tCur').textContent=fmtT(elapsed);
+      document.getElementById('progFg').style.width=Math.min(100,Math.round(aud.currentTime/aud.duration*100))+'%';
+      updateMini();
+    });
+    aud.addEventListener('ended',()=>{repeat?nextTrack():stopPlay();});
+  }
+  renderTL();startPlay();
+}
+function startPlay(){
+  playing=true;document.getElementById('playIco').className='ti ti-player-pause';
+  animEQ();stopTick();
+  ticker=setInterval(()=>{
+    if(aud)return;
+    elapsed++;
+    const t=activeGroup&&activeGroup.tracks[activeIdx];
+    if(!t){stopTick();return;}
+    document.getElementById('tCur').textContent=fmtT(elapsed);
+    document.getElementById('progFg').style.width=Math.min(100,Math.round(elapsed/t.dur*100))+'%';
+    updateMini();
+    if(elapsed>=t.dur){repeat?nextTrack():stopPlay();}
+  },1000);
+}
+function stopPlay(){
+  playing=false;document.getElementById('playIco').className='ti ti-player-play';
+  if(aud)aud.pause();stopTick();animEQ();updateMini();
+}
+function stopTick(){if(ticker){clearInterval(ticker);ticker=null;}if(eqTicker){clearInterval(eqTicker);eqTicker=null;}}
+function togglePlay(){
+  if(!activeGroup||activeIdx<0){if(activeGroup&&activeGroup.tracks.length)play(0);return;}
+  playing?stopPlay():(aud&&aud.play().catch(()=>{}),startPlay());
+}
+function nextTrack(){if(!activeGroup)return;const l=activeGroup.tracks.length;play(shuffle?Math.floor(Math.random()*l):(activeIdx+1)%l);}
+function prevTrack(){if(!activeGroup)return;if(elapsed>4){elapsed=0;if(aud)aud.currentTime=0;return;}play((activeIdx-1+activeGroup.tracks.length)%activeGroup.tracks.length);}
+function toggleShuffle(){shuffle=!shuffle;document.getElementById('shufBtn').classList.toggle('on',shuffle);}
+function toggleRepeat(){repeat=!repeat;document.getElementById('repBtn').classList.toggle('on',repeat);}
+function seek(e){
+  if(!activeGroup||activeIdx<0)return;
+  const bg=document.getElementById('progBg');
+  const pct=Math.max(0,Math.min(1,(e.clientX-bg.getBoundingClientRect().left)/bg.offsetWidth));
+  elapsed=Math.floor(pct*activeGroup.tracks[activeIdx].dur);
+  if(aud)aud.currentTime=elapsed;
+  document.getElementById('tCur').textContent=fmtT(elapsed);
+  document.getElementById('progFg').style.width=Math.round(pct*100)+'%';
+}
+function setVol(v){document.getElementById('volFill').style.width=v+'%';if(aud)aud.volume=v/100;}
+
+// ── SEARCH ───────────────────────────────────────────────────
+function doSearch(q){document.getElementById('srchClr').style.display=q?'block':'none';renderGroups();}
+function clearSearch(){document.getElementById('searchInp').value='';document.getElementById('srchClr').style.display='none';renderGroups();}
+
+// ── SHEET ────────────────────────────────────────────────────
+function buildMoodPicker(){
+  document.getElementById('moodRow').innerHTML=Object.entries(MOODS).map(([k,m])=>{
+    const a=k===sMood;
+    return `<button class="mood-btn${a?' active':''}" style="${a?`background:${m.bg};color:${m.color};border-color:${m.bc};`:''}" onclick="setMood('${k}',this)">${m.label}</button>`;
+  }).join('');
+}
+function setMood(k,el){
+  sMood=k;
+  document.querySelectorAll('.mood-btn').forEach(b=>{b.classList.remove('active');b.style.cssText='';});
+  const m=MOODS[k];el.classList.add('active');el.style.background=m.bg;el.style.color=m.color;el.style.borderColor=m.bc;
+}
+function setCat(c,el){
+  sCat=c;
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+function onLinkInput(){
+  document.getElementById('btnAdd').disabled=!document.getElementById('addLink').value.trim();
+  document.getElementById('fetchStatus').className='fetch-status';
+}
+function openSheet(){
+  document.getElementById('addLink').value='';
+  document.getElementById('addName').value='';
+  document.getElementById('fetchStatus').className='fetch-status';
+  document.getElementById('btnAdd').disabled=true;
+  sCat='films';sMood='chill';
+  document.querySelectorAll('.cat-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
+  buildMoodPicker();
+  document.getElementById('sheetOverlay').classList.add('open');
+}
+function closeSheet(){document.getElementById('sheetOverlay').classList.remove('open');}
+function overlayClick(e){if(e.target===document.getElementById('sheetOverlay'))closeSheet();}
+async function addEntry(){
+  const link=document.getElementById('addLink').value.trim();
+  const name=document.getElementById('addName').value.trim()||'Untitled';
+  if(!link)return;
+  const btn=document.getElementById('btnAdd');
+  const st=document.getElementById('fetchStatus');
+  btn.disabled=true;
+  st.className='fetch-status loading';
+  st.innerHTML='<span class="spin"></span>Fetching tracks from OneDrive…';
+  try{
+    const tracks=await fetchFolder(link);
+    lib[sCat].push({id:name+'_'+Date.now(),name,mood:sMood,link,tracks});
+    rebuildMood();saveLib();
+    st.className='fetch-status success';
+    st.textContent=`✓ Found ${tracks.length} track${tracks.length!==1?'s':''}. Added to ${sCat==='films'?'Films':'Artists'}.`;
+    setTimeout(()=>{closeSheet();renderGroups();},1400);
+  }catch(err){
+    st.className='fetch-status error';
+    st.textContent=err.message||'Could not fetch. Make sure the link is set to "Anyone can view".';
+    btn.disabled=false;
+  }
+}
+
+// ── CLOCK + INIT ─────────────────────────────────────────────
+function tick(){const n=new Date();document.getElementById('clockTime').textContent=n.getHours()+':'+(n.getMinutes()+'').padStart(2,'0');}
+buildEQ();loadLib();renderGroups();tick();setInterval(tick,30000);
+</script>
+</body>
+</html>
