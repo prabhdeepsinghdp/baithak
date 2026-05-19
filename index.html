@@ -22,6 +22,20 @@
     }
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
     html,body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;height:100%;overflow:hidden;position:fixed;width:100%;}
+
+    /* SIGNIN SCREEN */
+    .signin-screen{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px;}
+    .signin-screen.hidden{display:none;}
+    .signin-card{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:40px 32px;width:100%;max-width:340px;text-align:center;}
+    .signin-arch{height:3px;border-radius:2px;margin-bottom:28px;background:repeating-linear-gradient(90deg,var(--saffron) 0,var(--saffron) 10px,var(--terracotta) 10px,var(--terracotta) 20px,var(--marigold) 20px,var(--marigold) 30px,var(--indigo2) 30px,var(--indigo2) 40px);}
+    .signin-wordmark{font-family:var(--deva);font-size:36px;font-weight:900;color:var(--text);margin-bottom:6px;}
+    .signin-wordmark span{color:var(--terracotta);}
+    .signin-tagline{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.18em;text-transform:uppercase;margin-bottom:36px;}
+    .signin-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:'Syne',sans-serif;font-size:14px;font-weight:500;padding:14px;cursor:pointer;transition:all 0.15s;}
+    .signin-btn:active{background:var(--raised);}
+    .signin-btn svg{flex-shrink:0;}
+    .signin-note{font-family:var(--mono);font-size:9px;color:var(--subtle);margin-top:16px;line-height:1.8;letter-spacing:0.06em;}
+
     .app{display:flex;flex-direction:column;height:100%;max-width:480px;margin:0 auto;overflow:hidden;}
     .arch-bar{height:4px;flex-shrink:0;background:repeating-linear-gradient(90deg,var(--saffron) 0,var(--saffron) 12px,var(--terracotta) 12px,var(--terracotta) 24px,var(--marigold) 24px,var(--marigold) 36px,var(--indigo2) 36px,var(--indigo2) 48px);}
     .screen{display:none;flex-direction:column;flex:1;overflow:hidden;}
@@ -30,7 +44,7 @@
     .scroll-area::-webkit-scrollbar{display:none;}
     .sbar{display:flex;justify-content:space-between;align-items:center;padding:10px 20px 4px;flex-shrink:0;}
     .sbar-time{font-family:var(--mono);font-size:11px;color:var(--muted);}
-    .sbar-icons{display:flex;gap:6px;}
+    .sbar-icons{display:flex;gap:6px;align-items:center;}
     .sbar-icons i{font-size:13px;color:var(--muted);}
     .bottom-nav{display:flex;border-top:1px solid var(--border);background:var(--panel);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0px);}
     .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:11px 0 13px;background:none;border:none;cursor:pointer;color:var(--muted);font-family:'Syne',sans-serif;font-size:9px;letter-spacing:0.06em;border-top:2px solid transparent;transition:all 0.15s;}
@@ -74,6 +88,9 @@
     .lib-topbar{padding:10px 20px 10px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
     .lib-wordmark{font-family:var(--deva);font-size:26px;font-weight:900;line-height:1;color:var(--text);}
     .lib-wordmark span{color:var(--terracotta);}
+    .lib-topbar-right{display:flex;align-items:center;gap:4px;}
+    .signout-btn{background:none;border:none;color:var(--subtle);cursor:pointer;font-size:15px;padding:8px;display:flex;align-items:center;border-radius:50%;min-width:36px;min-height:36px;justify-content:center;}
+    .signout-btn:active{background:rgba(255,255,255,0.05);}
     .search-pill{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:22px;padding:9px 16px;margin:0 20px 14px;flex-shrink:0;}
     .search-pill i{font-size:14px;color:var(--muted);}
     .search-pill input{background:none;border:none;outline:none;color:var(--text);font-size:13px;font-family:'Syne',sans-serif;flex:1;}
@@ -159,7 +176,7 @@
     .btn-add:active{opacity:0.85;}
     .btn-add:disabled{opacity:0.38;cursor:not-allowed;}
 
-    /* EMPTY */
+    /* EMPTY / LOADING */
     .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 24px;gap:12px;text-align:center;}
     .empty-state i{font-size:36px;color:var(--subtle);}
     .empty-title{font-size:14px;font-weight:500;color:var(--muted);}
@@ -169,7 +186,27 @@
   </style>
 </head>
 <body>
-<div class="app">
+
+<!-- SIGN IN SCREEN -->
+<div class="signin-screen" id="signinScreen">
+  <div class="signin-card">
+    <div class="signin-arch"></div>
+    <div class="signin-wordmark"><span>ब</span>ैठक</div>
+    <div class="signin-tagline">Your personal music</div>
+    <button class="signin-btn" onclick="signIn()">
+      <svg width="18" height="18" viewBox="0 0 21 21" fill="none">
+        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+      </svg>
+      Sign in with Microsoft
+    </button>
+    <div class="signin-note">Signs in to your OneDrive to fetch music from your folders. Your data stays on your account.</div>
+  </div>
+</div>
+
+<div class="app" id="mainApp" style="display:none">
   <div class="arch-bar"></div>
   <div class="sbar">
     <span class="sbar-time" id="clockTime">9:41</span>
@@ -220,7 +257,10 @@
   <div class="screen" id="scrLib">
     <div class="lib-topbar">
       <div class="lib-wordmark"><span>ब</span>ैठक</div>
-      <button class="icon-btn" onclick="openSheet()" aria-label="Add album"><i class="ti ti-plus"></i></button>
+      <div class="lib-topbar-right">
+        <button class="icon-btn" onclick="openSheet()" aria-label="Add album"><i class="ti ti-plus"></i></button>
+        <button class="signout-btn" onclick="signOut()" title="Sign out" aria-label="Sign out"><i class="ti ti-logout"></i></button>
+      </div>
     </div>
     <div class="miniplayer" id="miniLib" onclick="goNP()">
       <div class="mini-info">
@@ -288,7 +328,6 @@
       3. Paste it below and tap Fetch &amp; Add
     </div>
     <div class="sheet-hr"></div>
-
     <div class="field">
       <label>OneDrive folder link</label>
       <input id="addLink" type="url" placeholder="https://1drv.ms/f/…" oninput="onLinkInput()"/>
@@ -297,16 +336,13 @@
       <label>Name</label>
       <input id="addName" type="text" placeholder="e.g. Rockstar (2011) or Jagjit Singh"/>
     </div>
-
     <div class="row-label">Category</div>
     <div class="cat-row">
       <button class="cat-btn active" onclick="setCat('films',this)">Film</button>
       <button class="cat-btn" onclick="setCat('artists',this)">Artist</button>
     </div>
-
     <div class="row-label">Mood</div>
     <div class="mood-row" id="moodRow"></div>
-
     <div class="fetch-status" id="fetchStatus"></div>
     <div class="sheet-actions">
       <button class="btn-cancel" onclick="closeSheet()">Cancel</button>
@@ -316,6 +352,137 @@
 </div>
 
 <script>
+// ── AZURE / OAUTH CONFIG ──────────────────────────────────────
+const CLIENT_ID   = '92f67cdb-e383-4afc-b465-d898edf13975';
+const REDIRECT_URI= 'https://prabhdeepsinghdp.github.io/baithak/';
+const SCOPES      = 'Files.Read User.Read';
+const AUTH_URL    = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize';
+const TOKEN_URL   = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token';
+const GRAPH       = 'https://graph.microsoft.com/v1.0';
+
+let accessToken = null;
+let tokenExpiry = 0;
+
+// ── PKCE HELPERS ─────────────────────────────────────────────
+function randomBase64(len){
+  const arr=new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return btoa(String.fromCharCode(...arr)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+async function sha256Base64(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+
+// ── TOKEN STORAGE ─────────────────────────────────────────────
+function saveTokens(data){
+  const exp=Date.now()+(data.expires_in-60)*1000;
+  localStorage.setItem('bt_token',data.access_token);
+  localStorage.setItem('bt_expiry',exp);
+  if(data.refresh_token) localStorage.setItem('bt_refresh',data.refresh_token);
+  accessToken=data.access_token; tokenExpiry=exp;
+}
+function loadTokens(){
+  accessToken=localStorage.getItem('bt_token');
+  tokenExpiry=parseInt(localStorage.getItem('bt_expiry')||'0');
+  return accessToken&&Date.now()<tokenExpiry;
+}
+function clearTokens(){
+  ['bt_token','bt_expiry','bt_refresh','bt_state','bt_pkce'].forEach(k=>localStorage.removeItem(k));
+  accessToken=null; tokenExpiry=0;
+}
+
+// ── AUTH FLOW ─────────────────────────────────────────────────
+async function signIn(){
+  const verifier=randomBase64(32);
+  const challenge=await sha256Base64(verifier);
+  const state=randomBase64(16);
+  localStorage.setItem('bt_pkce',verifier);
+  localStorage.setItem('bt_state',state);
+  window.location.href=AUTH_URL
+    +'?client_id='+CLIENT_ID
+    +'&response_type=code'
+    +'&redirect_uri='+encodeURIComponent(REDIRECT_URI)
+    +'&scope='+encodeURIComponent(SCOPES+' offline_access')
+    +'&state='+state
+    +'&code_challenge='+challenge
+    +'&code_challenge_method=S256'
+    +'&prompt=select_account';
+}
+
+async function exchangeCode(code){
+  const verifier=localStorage.getItem('bt_pkce');
+  const body=new URLSearchParams({
+    client_id:CLIENT_ID,grant_type:'authorization_code',
+    code,redirect_uri:REDIRECT_URI,code_verifier:verifier
+  });
+  const r=await fetch(TOKEN_URL,{method:'POST',body});
+  const data=await r.json();
+  if(data.access_token){saveTokens(data);launch();}
+  else{clearTokens();showSignin();}
+}
+
+async function refreshToken(){
+  if(accessToken&&Date.now()<tokenExpiry) return;
+  const refresh=localStorage.getItem('bt_refresh');
+  if(!refresh){clearTokens();showSignin();throw new Error('no refresh');}
+  const body=new URLSearchParams({
+    client_id:CLIENT_ID,grant_type:'refresh_token',
+    refresh_token:refresh,scope:SCOPES+' offline_access'
+  });
+  const r=await fetch(TOKEN_URL,{method:'POST',body});
+  const data=await r.json();
+  if(!data.access_token){clearTokens();showSignin();throw new Error('refresh failed');}
+  saveTokens(data);
+}
+
+function signOut(){
+  clearTokens();
+  localStorage.removeItem('baithak_v1');
+  window.location.href='https://login.microsoftonline.com/consumers/oauth2/v2.0/logout?post_logout_redirect_uri='+encodeURIComponent(REDIRECT_URI);
+}
+
+function showSignin(){
+  document.getElementById('signinScreen').classList.remove('hidden');
+  document.getElementById('mainApp').style.display='none';
+}
+
+function launch(){
+  document.getElementById('signinScreen').classList.add('hidden');
+  document.getElementById('mainApp').style.display='flex';
+  buildEQ();loadLib();renderGroups();tick();setInterval(tick,30000);
+}
+
+// ── GRAPH API CALL ────────────────────────────────────────────
+async function gFetch(url){
+  await refreshToken();
+  const r=await fetch(url,{headers:{Authorization:'Bearer '+accessToken,Accept:'application/json'}});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  return r.json();
+}
+
+// ── ONEDRIVE FOLDER FETCH ─────────────────────────────────────
+async function fetchFolder(link){
+  if(!link.includes('1drv.ms')&&!link.includes('onedrive.live.com')&&!link.includes('sharepoint.com'))
+    throw new Error('This does not look like a OneDrive link.');
+  if(link.includes('1drv.ms/s/'))
+    throw new Error('This is a file link (/s/…). Right-click the folder itself to share — the link should contain /f/.');
+  const enc=btoa(link).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const data=await gFetch(GRAPH+'/shares/u!'+enc+'/root/children?$select=name,size,file,@microsoft.graph.downloadUrl');
+  const files=(data.value||[])
+    .filter(f=>f.file&&/\.(mp3|flac|m4a|aac|wav|ogg)$/i.test(f.name))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  if(!files.length) throw new Error('No audio files found. Make sure MP3/FLAC files are directly inside this folder, not in sub-folders.');
+  return files.map(f=>({
+    t:f.name.replace(/^\d+[\s\-_.]+/,'').replace(/\.[^.]+$/,''),
+    a:'',
+    dur:f.size?Math.round(f.size/32000):200,
+    fmt:f.name.split('.').pop().toUpperCase(),
+    url:f['@microsoft.graph.downloadUrl']||null,
+  }));
+}
+
+// ── MOODS ─────────────────────────────────────────────────────
 const MOODS={
   chill: {label:'Chill', color:'#8B70CC',bg:'rgba(107,79,168,0.2)', bc:'rgba(107,79,168,0.4)' },
   party: {label:'Party', color:'#B8436A',bg:'rgba(184,67,106,0.18)',bc:'rgba(184,67,106,0.38)'},
@@ -324,48 +491,15 @@ const MOODS={
   focus: {label:'Focus', color:'#4a8FD5',bg:'rgba(42,95,168,0.18)', bc:'rgba(42,95,168,0.38)' },
 };
 
-// ── STORAGE ──────────────────────────────────────────────────
+// ── STORAGE ───────────────────────────────────────────────────
 function saveLib(){ localStorage.setItem('baithak_v1',JSON.stringify({films:lib.films,artists:lib.artists})); }
 function loadLib(){
-  try{
-    const s=JSON.parse(localStorage.getItem('baithak_v1')||'{}');
-    lib.films=s.films||[]; lib.artists=s.artists||[];
-  }catch(e){lib.films=[];lib.artists=[];}
+  try{const s=JSON.parse(localStorage.getItem('baithak_v1')||'{}');lib.films=s.films||[];lib.artists=s.artists||[];}
+  catch(e){lib.films=[];lib.artists=[];}
   rebuildMood();
 }
 
-// ── ONEDRIVE FETCH ───────────────────────────────────────────
-async function fetchFolder(link){
-  if(!link.includes("1drv.ms")&&!link.includes("onedrive.live.com")&&!link.includes("sharepoint.com"))
-    throw new Error("This does not look like a OneDrive link. Copy the share link directly from OneDrive.");
-  if(link.includes("1drv.ms/s/"))
-    throw new Error("This is a file link (/s/), not a folder link. Right-click the folder itself → Share → copy. The link should contain /f/ not /s/.");
-  const enc=btoa(link).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
-  const url="https://graph.microsoft.com/v1.0/shares/u!"+enc+"/root/children?\$select=name,size,file,@microsoft.graph.downloadUrl";
-  const res=await fetch(url,{headers:{"Accept":"application/json"}});
-  if(res.status===401||res.status===403)
-    throw new Error("OneDrive says this folder is private. Right-click the album folder (not the parent) → Share → \"Anyone with the link can view\" → Copy link.");
-  if(res.status===404)
-    throw new Error("Folder not found. Check the link is correct and the folder exists.");
-  if(!res.ok){
-    const body=await res.text().catch(()=>"");
-    throw new Error("OneDrive error (HTTP "+res.status+"). "+body.slice(0,200));
-  }
-  const data=await res.json();
-  const files=(data.value||[])
-    .filter(f=>f.file&&/\.(mp3|flac|m4a|aac|wav|ogg)$/i.test(f.name))
-    .sort((a,b)=>a.name.localeCompare(b.name));
-  if(!files.length) throw new Error("No audio files found. Make sure MP3/FLAC files are directly inside this folder, not in sub-folders.");
-  return files.map(f=>({
-    t:f.name.replace(/^\d+[\s\-_.]+/,"").replace(/\.[^.]+$/,""),
-    a:"",
-    dur:f.size?Math.round(f.size/32000):200,
-    fmt:f.name.split(".").pop().toUpperCase(),
-    url:f["@microsoft.graph.downloadUrl"]||null,
-  }));
-}
-
-// ── STATE ────────────────────────────────────────────────────
+// ── STATE ─────────────────────────────────────────────────────
 const lib={films:[],artists:[],mood:[]};
 let tab='films',activeGroup=null,activeIdx=-1;
 let playing=false,shuffle=true,repeat=true,elapsed=0;
@@ -381,7 +515,7 @@ function rebuildMood(){
   lib.mood=Object.entries(MOODS).map(([k,m])=>({id:'m_'+k,name:m.label,mood:k,tracks:by[k]||[],path:'/Music'}));
 }
 
-// ── NAV ──────────────────────────────────────────────────────
+// ── NAV ───────────────────────────────────────────────────────
 function fmtT(s){return Math.floor(s/60)+':'+(Math.floor(s%60)+'').padStart(2,'0');}
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -395,7 +529,7 @@ function goNP(){showScreen('scrNP');}
 function goLib(){renderGroups();showScreen('scrLib');}
 function goSearch(){showScreen('scrLib');setTimeout(()=>document.getElementById('searchInp').focus(),80);}
 
-// ── EQ ───────────────────────────────────────────────────────
+// ── EQ ────────────────────────────────────────────────────────
 function buildEQ(){
   const eq=document.getElementById('artEq');eq.innerHTML='';eqBars=[];
   for(let i=0;i<30;i++){
@@ -416,7 +550,7 @@ function animEQ(){
   },90);
 }
 
-// ── MINI ─────────────────────────────────────────────────────
+// ── MINI PLAYER ───────────────────────────────────────────────
 function updateMini(){
   const has=activeGroup&&activeIdx>=0;
   document.getElementById('miniLib').classList.toggle('visible',has);
@@ -432,7 +566,7 @@ function updateMini(){
   });
 }
 
-// ── LIBRARY ──────────────────────────────────────────────────
+// ── LIBRARY RENDER ────────────────────────────────────────────
 function switchTab(t,el){
   tab=t;
   document.querySelectorAll('.btab').forEach(b=>b.classList.remove('active'));
@@ -447,19 +581,19 @@ function renderGroups(){
   if(!list.length){
     const isEmpty=!lib.films.length&&!lib.artists.length&&tab!=='mood';
     gl.innerHTML=isEmpty
-      ?`<div class="empty-state"><i class="ti ti-music"></i><div class="empty-title">Your library is empty</div><div class="empty-sub">Tap the + button to add your<br>first album or artist folder</div></div>`
-      :`<div class="empty-state"><i class="ti ti-search"></i><div class="empty-title">No results</div></div>`;
+      ?'<div class="empty-state"><i class="ti ti-music"></i><div class="empty-title">Your library is empty</div><div class="empty-sub">Tap the + button to add your<br>first album or artist folder</div></div>'
+      :'<div class="empty-state"><i class="ti ti-search"></i><div class="empty-title">No results</div></div>';
     return;
   }
   gl.innerHTML=list.map(g=>{
     const m=MOODS[g.mood]||MOODS.chill;
     const isA=activeGroup&&activeGroup.id===g.id;
-    const del=tab!=='mood'?`<button class="gcard-del" onclick="event.stopPropagation();del('${g.id}')" aria-label="Remove"><i class="ti ti-trash"></i></button>`:'';
-    return `<div class="gcard${isA?' active-g':''}" onclick="openGroup('${g.id}')">
-      <div class="gcard-dot" style="background:${m.color}"></div>
-      <div class="gcard-info"><div class="gcard-name">${g.name}</div><div class="gcard-meta">${g.tracks.length} tracks · <span style="color:${m.color}">${m.label}</span></div></div>
-      ${del}<i class="ti ti-chevron-right gcard-arrow"></i>
-    </div>`;
+    const del=tab!=='mood'?'<button class="gcard-del" onclick="event.stopPropagation();del(\''+g.id+'\')" aria-label="Remove"><i class="ti ti-trash"></i></button>':'';
+    return '<div class="gcard'+(isA?' active-g':'')+'" onclick="openGroup(\''+g.id+'\')">'
+      +'<div class="gcard-dot" style="background:'+m.color+'"></div>'
+      +'<div class="gcard-info"><div class="gcard-name">'+g.name+'</div>'
+      +'<div class="gcard-meta">'+g.tracks.length+' tracks · <span style="color:'+m.color+'">'+m.label+'</span></div></div>'
+      +del+'<i class="ti ti-chevron-right gcard-arrow"></i></div>';
   }).join('');
 }
 function del(id){
@@ -482,16 +616,16 @@ function openGroup(id){
 function renderTL(){
   if(!activeGroup)return;
   document.getElementById('trackList').innerHTML=activeGroup.tracks.map((t,i)=>
-    `<div class="trow${activeIdx===i?' active-t':''}" onclick="play(${i})">
-      <span class="trow-num">${String(i+1).padStart(2,'0')}</span>
-      <div class="trow-info"><div class="trow-title">${t.t}</div><div class="trow-artist">${t.a||activeGroup.name}</div></div>
-      <div class="trow-right"><span class="trow-fmt">${t.fmt}</span><span class="trow-dur">${fmtT(t.dur)}</span></div>
-    </div>`
+    '<div class="trow'+(activeIdx===i?' active-t':'')+'" onclick="play('+i+')">'
+    +'<span class="trow-num">'+String(i+1).padStart(2,'0')+'</span>'
+    +'<div class="trow-info"><div class="trow-title">'+t.t+'</div><div class="trow-artist">'+(t.a||activeGroup.name)+'</div></div>'
+    +'<div class="trow-right"><span class="trow-fmt">'+t.fmt+'</span><span class="trow-dur">'+fmtT(t.dur)+'</span></div>'
+    +'</div>'
   ).join('');
 }
 function playAll(){if(!activeGroup||!activeGroup.tracks.length)return;play(0);goNP();}
 
-// ── PLAYBACK ─────────────────────────────────────────────────
+// ── PLAYBACK ──────────────────────────────────────────────────
 function play(idx){
   if(!activeGroup)return;
   stopTick();activeIdx=idx;elapsed=0;
@@ -503,7 +637,7 @@ function play(idx){
   document.getElementById('tTot').textContent=fmtT(t.dur);
   document.getElementById('tCur').textContent='0:00';
   document.getElementById('progFg').style.width='0%';
-  document.getElementById('npMood').innerHTML=`<div class="mood-pill" style="background:${m.bg};color:${m.color};border-color:${m.bc}"><i class="ti ti-circle-dot" style="font-size:10px;"></i>${m.label}</div>`;
+  document.getElementById('npMood').innerHTML='<div class="mood-pill" style="background:'+m.bg+';color:'+m.color+';border-color:'+m.bc+'"><i class="ti ti-circle-dot" style="font-size:10px;"></i>'+m.label+'</div>';
   if(t.url){
     if(aud){aud.pause();aud=null;}
     aud=new Audio(t.url);
@@ -558,15 +692,15 @@ function seek(e){
 }
 function setVol(v){document.getElementById('volFill').style.width=v+'%';if(aud)aud.volume=v/100;}
 
-// ── SEARCH ───────────────────────────────────────────────────
+// ── SEARCH ────────────────────────────────────────────────────
 function doSearch(q){document.getElementById('srchClr').style.display=q?'block':'none';renderGroups();}
 function clearSearch(){document.getElementById('searchInp').value='';document.getElementById('srchClr').style.display='none';renderGroups();}
 
-// ── SHEET ────────────────────────────────────────────────────
+// ── ADD SHEET ─────────────────────────────────────────────────
 function buildMoodPicker(){
   document.getElementById('moodRow').innerHTML=Object.entries(MOODS).map(([k,m])=>{
     const a=k===sMood;
-    return `<button class="mood-btn${a?' active':''}" style="${a?`background:${m.bg};color:${m.color};border-color:${m.bc};`:''}" onclick="setMood('${k}',this)">${m.label}</button>`;
+    return '<button class="mood-btn'+(a?' active':'')+'" style="'+(a?'background:'+m.bg+';color:'+m.color+';border-color:'+m.bc+';':'')+'" onclick="setMood(\''+k+'\',this)">'+m.label+'</button>';
   }).join('');
 }
 function setMood(k,el){
@@ -595,6 +729,7 @@ function openSheet(){
 }
 function closeSheet(){document.getElementById('sheetOverlay').classList.remove('open');}
 function overlayClick(e){if(e.target===document.getElementById('sheetOverlay'))closeSheet();}
+
 async function addEntry(){
   const link=document.getElementById('addLink').value.trim();
   const name=document.getElementById('addName').value.trim()||'Untitled';
@@ -609,18 +744,45 @@ async function addEntry(){
     lib[sCat].push({id:name+'_'+Date.now(),name,mood:sMood,link,tracks});
     rebuildMood();saveLib();
     st.className='fetch-status success';
-    st.textContent=`✓ Found ${tracks.length} track${tracks.length!==1?'s':''}. Added to ${sCat==='films'?'Films':'Artists'}.`;
+    st.textContent='✓ Found '+tracks.length+' track'+(tracks.length!==1?'s':'')+'. Added to '+(sCat==='films'?'Films':'Artists')+'.';
     setTimeout(()=>{closeSheet();renderGroups();},1400);
   }catch(err){
     st.className='fetch-status error';
-    st.textContent=err.message||'Could not fetch. Make sure the link is set to "Anyone can view".';
+    st.textContent=err.message||'Could not fetch. Check the link and try again.';
     btn.disabled=false;
   }
 }
 
-// ── CLOCK + INIT ─────────────────────────────────────────────
+// ── CLOCK + INIT ──────────────────────────────────────────────
 function tick(){const n=new Date();document.getElementById('clockTime').textContent=n.getHours()+':'+(n.getMinutes()+'').padStart(2,'0');}
-buildEQ();loadLib();renderGroups();tick();setInterval(tick,30000);
+
+async function init(){
+  // Handle OAuth callback
+  const params=new URLSearchParams(window.location.search);
+  const code=params.get('code');
+  const state=params.get('state');
+  const savedState=localStorage.getItem('bt_state');
+  if(code&&state&&state===savedState){
+    window.history.replaceState({},'',window.location.pathname);
+    await exchangeCode(code);
+    return;
+  }
+  // Try existing token
+  if(loadTokens()){launch();return;}
+  // Try refresh
+  const refresh=localStorage.getItem('bt_refresh');
+  if(refresh){
+    try{
+      const body=new URLSearchParams({client_id:CLIENT_ID,grant_type:'refresh_token',refresh_token:refresh,scope:SCOPES+' offline_access'});
+      const r=await fetch(TOKEN_URL,{method:'POST',body});
+      const data=await r.json();
+      if(data.access_token){saveTokens(data);launch();return;}
+    }catch(e){}
+  }
+  showSignin();
+}
+
+init();
 </script>
 </body>
 </html>
