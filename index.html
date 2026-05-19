@@ -382,226 +382,146 @@
 </div>
 
 <script>
-// ── AZURE / OAUTH CONFIG ──────────────────────────────────────
+// ── CONFIG ────────────────────────────────────────────────────
 const CLIENT_ID   = '92f67cdb-e383-4afc-b465-d898edf13975';
 const REDIRECT_URI= 'https://prabhdeepsinghdp.github.io/baithak/';
 const SCOPES      = 'Files.ReadWrite User.Read';
 const AUTH_URL    = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize';
 const TOKEN_URL   = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token';
 const GRAPH       = 'https://graph.microsoft.com/v1.0';
+const LIBRARY_FILE= 'baithak-library.json';
 
-let accessToken = null;
-let tokenExpiry = 0;
+let accessToken=null, tokenExpiry=0, syncTimer=null;
 
-// ── PKCE HELPERS ─────────────────────────────────────────────
-function randomBase64(len){
-  const arr=new Uint8Array(len);
-  crypto.getRandomValues(arr);
-  return btoa(String.fromCharCode(...arr)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-}
-async function sha256Base64(str){
-  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
-  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-}
+// ── PKCE ──────────────────────────────────────────────────────
+function randomBase64(len){const a=new Uint8Array(len);crypto.getRandomValues(a);return btoa(String.fromCharCode(...a)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');}
+async function sha256Base64(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');}
 
-// ── TOKEN STORAGE ─────────────────────────────────────────────
-function saveTokens(data){
-  const exp=Date.now()+(data.expires_in-60)*1000;
-  localStorage.setItem('bt_token',data.access_token);
+// ── TOKENS ────────────────────────────────────────────────────
+function saveTokens(d){
+  const exp=Date.now()+(d.expires_in-60)*1000;
+  localStorage.setItem('bt_token',d.access_token);
   localStorage.setItem('bt_expiry',exp);
-  if(data.refresh_token) localStorage.setItem('bt_refresh',data.refresh_token);
-  if(data.scope) localStorage.setItem('bt_scope',data.scope);
-  accessToken=data.access_token; tokenExpiry=exp;
+  if(d.refresh_token)localStorage.setItem('bt_refresh',d.refresh_token);
+  if(d.scope)localStorage.setItem('bt_scope',d.scope);
+  accessToken=d.access_token;tokenExpiry=exp;
 }
 function loadTokens(){
   accessToken=localStorage.getItem('bt_token');
   tokenExpiry=parseInt(localStorage.getItem('bt_expiry')||'0');
-  return accessToken&&Date.now()<tokenExpiry;
+  return !!(accessToken&&Date.now()<tokenExpiry);
 }
 function clearTokens(){
-  ['bt_token','bt_expiry','bt_refresh','bt_state','bt_pkce'].forEach(k=>localStorage.removeItem(k));
-  accessToken=null; tokenExpiry=0;
+  ['bt_token','bt_expiry','bt_refresh','bt_state','bt_pkce','bt_scope'].forEach(k=>localStorage.removeItem(k));
+  accessToken=null;tokenExpiry=0;
 }
 
-// ── AUTH FLOW ─────────────────────────────────────────────────
+// ── AUTH ──────────────────────────────────────────────────────
 async function signIn(){
-  const verifier=randomBase64(32);
-  const challenge=await sha256Base64(verifier);
-  const state=randomBase64(16);
-  localStorage.setItem('bt_pkce',verifier);
-  localStorage.setItem('bt_state',state);
-  window.location.href=AUTH_URL
-    +'?client_id='+CLIENT_ID
-    +'&response_type=code'
-    +'&redirect_uri='+encodeURIComponent(REDIRECT_URI)
-    +'&scope='+encodeURIComponent(SCOPES+' offline_access')
-    +'&state='+state
-    +'&code_challenge='+challenge
-    +'&code_challenge_method=S256'
-    +'&prompt=select_account';
+  const verifier=randomBase64(32), challenge=await sha256Base64(verifier), state=randomBase64(16);
+  localStorage.setItem('bt_pkce',verifier);localStorage.setItem('bt_state',state);
+  window.location.href=AUTH_URL+'?client_id='+CLIENT_ID+'&response_type=code&redirect_uri='+encodeURIComponent(REDIRECT_URI)+'&scope='+encodeURIComponent(SCOPES+' offline_access')+'&state='+state+'&code_challenge='+challenge+'&code_challenge_method=S256&prompt=select_account';
 }
-
 async function exchangeCode(code){
-  const verifier=localStorage.getItem('bt_pkce');
-  const body=new URLSearchParams({
-    client_id:CLIENT_ID,grant_type:'authorization_code',
-    code,redirect_uri:REDIRECT_URI,code_verifier:verifier
-  });
+  const body=new URLSearchParams({client_id:CLIENT_ID,grant_type:'authorization_code',code,redirect_uri:REDIRECT_URI,code_verifier:localStorage.getItem('bt_pkce')});
   const r=await fetch(TOKEN_URL,{method:'POST',body});
-  const data=await r.json();
-  if(data.access_token){saveTokens(data);launch();}
-  else{clearTokens();showSignin();}
+  const d=await r.json();
+  if(d.access_token){saveTokens(d);launch();}else{clearTokens();showSignin();}
 }
-
 async function refreshToken(){
-  if(accessToken&&Date.now()<tokenExpiry) return;
+  if(accessToken&&Date.now()<tokenExpiry)return;
   const refresh=localStorage.getItem('bt_refresh');
-  if(!refresh){clearTokens();showSignin();throw new Error('no refresh');}
-  const body=new URLSearchParams({
-    client_id:CLIENT_ID,grant_type:'refresh_token',
-    refresh_token:refresh,scope:SCOPES+' offline_access'
-  });
+  if(!refresh){clearTokens();showSignin();throw new Error('no refresh token');}
+  const body=new URLSearchParams({client_id:CLIENT_ID,grant_type:'refresh_token',refresh_token:refresh,scope:SCOPES+' offline_access'});
   const r=await fetch(TOKEN_URL,{method:'POST',body});
-  const data=await r.json();
-  if(!data.access_token){clearTokens();showSignin();throw new Error('refresh failed');}
-  saveTokens(data);
+  const d=await r.json();
+  if(!d.access_token){clearTokens();showSignin();throw new Error('refresh failed');}
+  saveTokens(d);
 }
-
 function signOut(){
-  clearTokens();
+  clearTokens();localStorage.removeItem('baithak-library.json');
   window.location.href='https://login.microsoftonline.com/consumers/oauth2/v2.0/logout?post_logout_redirect_uri='+encodeURIComponent(REDIRECT_URI);
 }
+function showSignin(){document.getElementById('signinScreen').classList.remove('hidden');document.getElementById('mainApp').style.display='none';}
 
-function showSignin(){
-  document.getElementById('signinScreen').classList.remove('hidden');
-  document.getElementById('mainApp').style.display='none';
-}
-
-async function launch(){
-  // If token was issued under old read-only scope, force re-auth for ReadWrite
-  const grantedScope = localStorage.getItem('bt_scope')||'';
-  if(!grantedScope.includes('ReadWrite')){
-    clearTokens();
-    showSignin();
-    return;
-  }
-  document.getElementById('signinScreen').classList.add('hidden');
-  document.getElementById('mainApp').style.display='flex';
-  buildEQ();tick();setInterval(tick,30000);
-  setSyncStatus('syncing','Loading your library…');
-  await loadLib();
-  renderGroups();
-}
-
-// ── GRAPH API CALL ────────────────────────────────────────────
+// ── GRAPH ─────────────────────────────────────────────────────
 async function gFetch(url){
   await refreshToken();
   const r=await fetch(url,{headers:{Authorization:'Bearer '+accessToken,Accept:'application/json'}});
-  if(!r.ok) throw new Error('HTTP '+r.status);
+  if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
 }
 
-// ── ONEDRIVE FOLDER FETCH ─────────────────────────────────────
-async function fetchFolder(link){
-  if(!link.includes('1drv.ms')&&!link.includes('onedrive.live.com')&&!link.includes('sharepoint.com'))
-    throw new Error('This does not look like a OneDrive link.');
-  if(link.includes('1drv.ms/s/'))
-    throw new Error('This is a file link (/s/\u2026). Right-click the folder itself \u2014 the link should contain /f/.');
-  const enc=btoa(link).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-  const data=await gFetch(GRAPH+'/shares/u!'+enc+'/root/children?$select=name,size,id,file,@microsoft.graph.downloadUrl');
+// ── STREAM URL ────────────────────────────────────────────────
+// Get a playable CDN URL for an item. Uses the same approach as cinema app.
+async function getStreamUrl(itemId){
+  await refreshToken();
+  // Request the downloadUrl field — this is a pre-signed CDN URL, no auth needed to stream
+  const r=await fetch(GRAPH+'/me/drive/items/'+itemId+'?$select=id,name,@microsoft.graph.downloadUrl',{
+    headers:{Authorization:'Bearer '+accessToken}
+  });
+  if(!r.ok)throw new Error('Graph items request failed: '+r.status);
+  const d=await r.json();
+  console.log('Graph response keys:',Object.keys(d));
+  const url=d['@microsoft.graph.downloadUrl'];
+  console.log('downloadUrl present:',!!url, url?url.slice(0,60):'none');
+  if(!url)throw new Error('No downloadUrl in response');
+  return url;
+}
+
+// ── FOLDER SCAN ───────────────────────────────────────────────
+async function fetchFolder(shareLink){
+  if(!shareLink.includes('1drv.ms')&&!shareLink.includes('onedrive.live.com')&&!shareLink.includes('sharepoint.com'))
+    throw new Error('Not a OneDrive link');
+  const enc=btoa(shareLink).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const data=await gFetch(GRAPH+'/shares/u!'+enc+'/root/children?$select=name,size,id,file');
   const files=(data.value||[])
     .filter(f=>f.file&&/\.(mp3|flac|m4a|aac|wav|ogg)$/i.test(f.name))
     .sort((a,b)=>a.name.localeCompare(b.name));
-  if(!files.length) throw new Error('No audio files found. Make sure MP3/FLAC files are directly inside this folder, not in sub-folders.');
+  if(!files.length)throw new Error('No audio files found in this folder');
   return files.map(f=>({
     t:f.name.replace(/^\d+[\s\-_.]+/,'').replace(/\.[^.]+$/,''),
     a:'',
     dur:f.size?Math.round(f.size/32000):200,
     fmt:f.name.split('.').pop().toUpperCase(),
     itemId:f.id,
-    fileName:f.name,
   }));
 }
 
-// Resolve a fresh streaming URL — mirrors cinema app's /shares/driveItem approach
-async function getStreamUrl(itemId){
-  await refreshToken();
-  // Step 1: Ask Graph for the downloadUrl via driveItem metadata
-  // This is the most reliable way — returns a pre-signed CDN URL good for ~1hr
-  const meta=await fetch(GRAPH+'/me/drive/items/'+itemId+'?$select=id,@microsoft.graph.downloadUrl',{
-    headers:{Authorization:'Bearer '+accessToken}
-  });
-  if(!meta.ok) throw new Error('Meta fetch failed: '+meta.status);
-  const data=await meta.json();
-  const url=data['@microsoft.graph.downloadUrl'];
-  if(url){console.log('Got downloadUrl via meta');return url;}
-  // Step 2: fallback — try /content with manual redirect to grab Location header
-  const r=await fetch(GRAPH+'/me/drive/items/'+itemId+'/content',{
-    headers:{Authorization:'Bearer '+accessToken},
-    redirect:'manual'
-  });
-  // 302 redirect — Location header has the CDN URL
-  const loc=r.headers.get('Location');
-  if(loc){console.log('Got URL via redirect Location');return loc;}
-  throw new Error('Could not resolve stream URL');
-}
-
-
 // ── MOODS ─────────────────────────────────────────────────────
 const MOODS={
-  chill: {label:'Chill', color:'#8B70CC',bg:'rgba(107,79,168,0.2)', bc:'rgba(107,79,168,0.4)' },
+  chill: {label:'Chill', color:'#8B70CC',bg:'rgba(107,79,168,0.2)', bc:'rgba(107,79,168,0.4)'},
   party: {label:'Party', color:'#B8436A',bg:'rgba(184,67,106,0.18)',bc:'rgba(184,67,106,0.38)'},
-  travel:{label:'Travel',color:'#2E7D5E',bg:'rgba(46,125,94,0.18)', bc:'rgba(46,125,94,0.35)' },
-  gym:   {label:'Gym',   color:'#C4522A',bg:'rgba(196,82,42,0.18)', bc:'rgba(196,82,42,0.35)' },
-  focus: {label:'Focus', color:'#4a8FD5',bg:'rgba(42,95,168,0.18)', bc:'rgba(42,95,168,0.38)' },
+  travel:{label:'Travel',color:'#2E7D5E',bg:'rgba(46,125,94,0.18)', bc:'rgba(46,125,94,0.35)'},
+  gym:   {label:'Gym',   color:'#C4522A',bg:'rgba(196,82,42,0.18)', bc:'rgba(196,82,42,0.35)'},
+  focus: {label:'Focus', color:'#4a8FD5',bg:'rgba(42,95,168,0.18)', bc:'rgba(42,95,168,0.38)'},
 };
 
-// ── ONEDRIVE LIBRARY SYNC ────────────────────────────────────────────────────
-const LIBRARY_FILE = 'baithak-library.json';
-let syncTimer = null;
-
-function setSyncStatus(state, text){
-  const dot = document.getElementById('syncDot');
-  const txt = document.getElementById('syncTxt');
-  if(!dot||!txt) return;
-  dot.className = 'sync-dot '+state;
-  txt.textContent = text;
+// ── LIBRARY SYNC ──────────────────────────────────────────────
+function setSyncStatus(state,text){
+  const dot=document.getElementById('syncDot'),txt=document.getElementById('syncTxt');
+  if(dot)dot.className='sync-dot '+state;
+  if(txt)txt.textContent=text;
 }
-
 async function loadLib(){
   try{
     await refreshToken();
-    const r = await fetch(GRAPH+'/me/drive/root:/'+LIBRARY_FILE+':/content',
-      {headers:{Authorization:'Bearer '+accessToken}});
-    if(r.status===404){lib.films=[];lib.artists=[];setSyncStatus('synced','New library — ready');}
-    else if(!r.ok){throw new Error(r.status);}
-    else{
-      const data=await r.json();
-      lib.films=data.films||[];lib.artists=data.artists||[];
-      setSyncStatus('synced','Loaded · '+(lib.films.length+lib.artists.length)+' collections');
-    }
-  }catch(e){setSyncStatus('error','Could not load library');lib.films=[];lib.artists=[];}
+    const r=await fetch(GRAPH+'/me/drive/root:/'+LIBRARY_FILE+':/content',{headers:{Authorization:'Bearer '+accessToken}});
+    if(r.status===404){lib.films=[];lib.artists=[];setSyncStatus('synced','New library');}
+    else if(!r.ok)throw new Error(r.status);
+    else{const d=await r.json();lib.films=d.films||[];lib.artists=d.artists||[];setSyncStatus('synced','Loaded');}
+  }catch(e){setSyncStatus('error','Load failed');lib.films=[];lib.artists=[];}
   rebuildMood();
 }
-
 async function saveLib(){
   setSyncStatus('syncing','Saving…');
   try{
     await refreshToken();
-    const r=await fetch(GRAPH+'/me/drive/root:/'+LIBRARY_FILE+':/content',{
-      method:'PUT',
-      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify({films:lib.films,artists:lib.artists},null,2)
-    });
-    if(!r.ok) throw new Error(r.status);
-    const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    setSyncStatus('synced','Saved · '+t);
-  }catch(e){
-    setSyncStatus('error','Save failed — retrying…');
-    clearTimeout(syncTimer);syncTimer=setTimeout(saveLib,8000);
-  }
+    const r=await fetch(GRAPH+'/me/drive/root:/'+LIBRARY_FILE+':/content',{method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({films:lib.films,artists:lib.artists})});
+    if(!r.ok)throw new Error(r.status);
+    setSyncStatus('synced','Saved');
+  }catch(e){setSyncStatus('error','Save failed');clearTimeout(syncTimer);syncTimer=setTimeout(saveLib,8000);}
 }
-
 function debounceSave(){clearTimeout(syncTimer);syncTimer=setTimeout(saveLib,1500);}
 
 // ── STATE ─────────────────────────────────────────────────────
@@ -609,15 +529,11 @@ const lib={films:[],artists:[],mood:[]};
 let tab='films',activeGroup=null,activeIdx=-1;
 let playing=false,shuffle=true,repeat=true,elapsed=0;
 let ticker=null,eqTicker=null,eqBars=[];
-let aud=null; // points to document.getElementById('mainAudio')
 let sCat='films',sMood='chill';
 
 function rebuildMood(){
   const by={};
-  for(const cat of['films','artists']) for(const g of lib[cat]){
-    if(!by[g.mood])by[g.mood]=[];
-    by[g.mood].push(...(g.tracks||[]));
-  }
+  for(const cat of['films','artists'])for(const g of lib[cat]){if(!by[g.mood])by[g.mood]=[];by[g.mood].push(...(g.tracks||[]));}
   lib.mood=Object.entries(MOODS).map(([k,m])=>({id:'m_'+k,name:m.label,mood:k,tracks:by[k]||[],path:'/Music'}));
 }
 
@@ -627,8 +543,7 @@ function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   const m={scrNP:0,scrLib:1,scrTL:1};
-  const i=m[id]??1;
-  document.querySelectorAll('#'+id+' .nav-btn').forEach((b,j)=>b.classList.toggle('active',j===i));
+  document.querySelectorAll('#'+id+' .nav-btn').forEach((b,i)=>b.classList.toggle('active',i===(m[id]??1)));
   updateMini();
 }
 function goNP(){showScreen('scrNP');}
@@ -638,22 +553,12 @@ function goSearch(){showScreen('scrLib');setTimeout(()=>document.getElementById(
 // ── EQ ────────────────────────────────────────────────────────
 function buildEQ(){
   const eq=document.getElementById('artEq');eq.innerHTML='';eqBars=[];
-  for(let i=0;i<30;i++){
-    const b=document.createElement('div');b.className='art-bar';
-    const h=Math.sin((i/30)*Math.PI)*28+4;b.style.height=h+'px';b.dataset.h=h;
-    eq.appendChild(b);eqBars.push(b);
-  }
+  for(let i=0;i<30;i++){const b=document.createElement('div');b.className='art-bar';const h=Math.sin((i/30)*Math.PI)*28+4;b.style.height=h+'px';b.dataset.h=h;eq.appendChild(b);eqBars.push(b);}
 }
 function animEQ(){
   if(eqTicker)clearInterval(eqTicker);
   if(!playing){eqBars.forEach(b=>{b.style.height=b.dataset.h+'px';b.style.opacity='0.35';b.style.background='#c46a00';});return;}
-  eqTicker=setInterval(()=>{
-    eqBars.forEach(b=>{
-      const h=Math.max(2,Math.min(36,parseFloat(b.dataset.h)+(Math.random()-0.45)*18));
-      b.style.height=h+'px';b.style.opacity=h>20?'0.9':h>12?'0.65':'0.35';
-      b.style.background=h>22?'#E8850A':h>14?'#c46a00':'#8B4A20';
-    });
-  },90);
+  eqTicker=setInterval(()=>{eqBars.forEach(b=>{const h=Math.max(2,Math.min(36,parseFloat(b.dataset.h)+(Math.random()-0.45)*18));b.style.height=h+'px';b.style.opacity=h>20?'0.9':h>12?'0.65':'0.35';b.style.background=h>22?'#E8850A':h>14?'#c46a00':'#8B4A20';});},90);
 }
 
 // ── MINI PLAYER ───────────────────────────────────────────────
@@ -673,41 +578,25 @@ function updateMini(){
 }
 
 // ── LIBRARY RENDER ────────────────────────────────────────────
-function switchTab(t,el){
-  tab=t;
-  document.querySelectorAll('.btab').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active');
-  renderGroups();
-}
+function switchTab(t,el){tab=t;document.querySelectorAll('.btab').forEach(b=>b.classList.remove('active'));el.classList.add('active');renderGroups();}
 function renderGroups(){
   const items=tab==='mood'?lib.mood:tab==='films'?lib.films:lib.artists;
   const q=document.getElementById('searchInp').value.toLowerCase().trim();
   const list=q?items.filter(g=>g.name.toLowerCase().includes(q)||g.tracks.some(t=>t.t.toLowerCase().includes(q)||(t.a||'').toLowerCase().includes(q))):items;
   const gl=document.getElementById('groupList');
   if(!list.length){
-    const isEmpty=!lib.films.length&&!lib.artists.length&&tab!=='mood';
-    gl.innerHTML=isEmpty
-      ?'<div class="empty-state"><i class="ti ti-music"></i><div class="empty-title">Your library is empty</div><div class="empty-sub">Tap the + button to add your<br>first album or artist folder</div></div>'
-      :'<div class="empty-state"><i class="ti ti-search"></i><div class="empty-title">No results</div></div>';
+    const empty=!lib.films.length&&!lib.artists.length&&tab!=='mood';
+    gl.innerHTML=empty?'<div class="empty-state"><i class="ti ti-music"></i><div class="empty-title">Your library is empty</div><div class="empty-sub">Tap + to add your first album</div></div>':'<div class="empty-state"><i class="ti ti-search"></i><div class="empty-title">No results</div></div>';
     return;
   }
   gl.innerHTML=list.map(g=>{
     const m=MOODS[g.mood]||MOODS.chill;
     const isA=activeGroup&&activeGroup.id===g.id;
-    const del=tab!=='mood'?'<button class="gcard-del" onclick="event.stopPropagation();del(\''+g.id+'\')" aria-label="Remove"><i class="ti ti-trash"></i></button>':'';
-    return '<div class="gcard'+(isA?' active-g':'')+'" onclick="openGroup(\''+g.id+'\')">'
-      +'<div class="gcard-dot" style="background:'+m.color+'"></div>'
-      +'<div class="gcard-info"><div class="gcard-name">'+g.name+'</div>'
-      +'<div class="gcard-meta">'+g.tracks.length+' tracks · <span style="color:'+m.color+'">'+m.label+'</span></div></div>'
-      +del+'<i class="ti ti-chevron-right gcard-arrow"></i></div>';
+    const del=tab!=='mood'?'<button class="gcard-del" onclick="event.stopPropagation();del(''+g.id+'')" aria-label="Remove"><i class="ti ti-trash"></i></button>':'';
+    return '<div class="gcard'+(isA?' active-g':'')+'" onclick="openGroup(''+g.id+'')">'+'<div class="gcard-dot" style="background:'+m.color+'"></div>'+'<div class="gcard-info"><div class="gcard-name">'+g.name+'</div><div class="gcard-meta">'+g.tracks.length+' tracks · <span style="color:'+m.color+'">'+m.label+'</span></div></div>'+del+'<i class="ti ti-chevron-right gcard-arrow"></i></div>';
   }).join('');
 }
-function del(id){
-  lib.films=lib.films.filter(g=>g.id!==id);
-  lib.artists=lib.artists.filter(g=>g.id!==id);
-  if(activeGroup&&activeGroup.id===id){activeGroup=null;activeIdx=-1;}
-  rebuildMood();debounceSave();renderGroups();
-}
+function del(id){lib.films=lib.films.filter(g=>g.id!==id);lib.artists=lib.artists.filter(g=>g.id!==id);if(activeGroup&&activeGroup.id===id){activeGroup=null;activeIdx=-1;}rebuildMood();debounceSave();renderGroups();}
 function openGroup(id){
   const items=tab==='mood'?lib.mood:tab==='films'?lib.films:lib.artists;
   activeGroup=items.find(g=>g.id===id)||null;
@@ -732,10 +621,24 @@ function renderTL(){
 function playAll(){if(!activeGroup||!activeGroup.tracks.length)return;play(0);goNP();}
 
 // ── PLAYBACK ──────────────────────────────────────────────────
-async function play(idx){
+// Single audio element — reused for all tracks
+const AUD=new Audio();
+AUD.preload='none';
+
+function play(idx){
   if(!activeGroup)return;
-  stopTick();activeIdx=idx;elapsed=0;
   const t=activeGroup.tracks[idx];
+  if(!t)return;
+
+  // Stop whatever is currently playing
+  AUD.pause();
+  AUD.src='';
+  clearInterval(ticker);ticker=null;
+  clearInterval(eqTicker);eqTicker=null;
+
+  activeIdx=idx;elapsed=0;playing=false;
+
+  // Update UI
   const m=MOODS[activeGroup.mood]||MOODS.chill;
   document.getElementById('npTitle').textContent=t.t;
   document.getElementById('npArtist').textContent=t.a||activeGroup.name;
@@ -745,97 +648,100 @@ async function play(idx){
   document.getElementById('progFg').style.width='0%';
   document.getElementById('npMood').innerHTML='<div class="mood-pill" style="background:'+m.bg+';color:'+m.color+';border-color:'+m.bc+'"><i class="ti ti-circle-dot" style="font-size:10px;"></i>'+m.label+'</div>';
   renderTL();
-  // UI state — show playing immediately
-  playing=true;
-  document.getElementById('playIco').className='ti ti-player-pause';
-  animEQ();
-  stopTick();
-  // Fetch stream URL then play
-  if(t.itemId){
-    setSyncStatus('syncing','Loading…');
-    getStreamUrl(t.itemId)
-      .then(function(url){
-        setSyncStatus('synced','Streaming');
-        console.log('Got stream URL, setting audio src');
-        var a=document.getElementById('mainAudio');
-        a.pause();
-        a.src=url;
-        a.volume=document.getElementById('volR').value/100;
-        var p=a.play();
-        if(p) p.then(function(){
-          console.log('Audio playing OK');
-        }).catch(function(e){
-          console.warn('play() rejected:',e);
-          setSyncStatus('error','Tap play to start');
-        });
-        a.ontimeupdate=function(){
-          if(isNaN(a.duration))return;
-          elapsed=Math.floor(a.currentTime);
+
+  if(!t.itemId){
+    console.warn('Track has no itemId — delete and re-add this album');
+    setSyncStatus('error','Re-add this album to fix playback');
+    return;
+  }
+
+  setSyncStatus('syncing','Fetching stream URL…');
+  getStreamUrl(t.itemId).then(function(url){
+    console.log('Stream URL OK, length='+url.length+', starts='+url.slice(0,50));
+    AUD.src=url;
+    AUD.volume=document.getElementById('volR').value/100;
+
+    AUD.oncanplay=null;
+    AUD.ontimeupdate=null;
+    AUD.onended=null;
+    AUD.onerror=null;
+
+    AUD.oncanplay=function(){
+      console.log('canplay fired — calling play()');
+      AUD.play().then(function(){
+        console.log('Playing!');
+        playing=true;
+        document.getElementById('playIco').className='ti ti-player-pause';
+        setSyncStatus('synced','Playing');
+        animEQ();
+        // Real-time progress from audio element
+        AUD.ontimeupdate=function(){
+          if(isNaN(AUD.duration))return;
+          elapsed=Math.floor(AUD.currentTime);
           document.getElementById('tCur').textContent=fmtT(elapsed);
-          document.getElementById('progFg').style.width=Math.min(100,Math.round(a.currentTime/a.duration*100))+'%';
+          document.getElementById('progFg').style.width=Math.min(100,Math.round(AUD.currentTime/AUD.duration*100))+'%';
           updateMini();
         };
-        a.onended=function(){repeat?nextTrack():stopPlay();};
-        a.onerror=function(){
-          var c=a.error?a.error.code:'?';
-          var msg=a.error?a.error.message:'unknown';
-          console.error('Audio element error — code:',c,'message:',msg,'src:',a.src.slice(0,80));
-          setSyncStatus('error','Audio error '+c+' — see console');
-        };
-        aud=a;
-      })
-      .catch(function(e){
-        console.error('getStreamUrl failed:',e);
-        setSyncStatus('error','Could not get stream URL');
+      }).catch(function(e){
+        console.error('play() rejected:',e.name,e.message);
+        setSyncStatus('error','Playback blocked: '+e.name);
       });
-  }
+    };
+
+    AUD.onended=function(){
+      console.log('Track ended');
+      playing=false;
+      document.getElementById('playIco').className='ti ti-player-play';
+      animEQ();
+      if(repeat)nextTrack();
+    };
+
+    AUD.onerror=function(){
+      const code=AUD.error?AUD.error.code:0;
+      const msg=AUD.error?AUD.error.message:'unknown';
+      console.error('Audio error — code:'+code+' msg:'+msg);
+      setSyncStatus('error','Audio error '+code);
+    };
+
+    AUD.load();
+
+  }).catch(function(e){
+    console.error('getStreamUrl error:',e.message);
+    setSyncStatus('error','Could not get URL: '+e.message);
+  });
 }
-function startPlay(){
-  playing=true;document.getElementById('playIco').className='ti ti-player-pause';
-  animEQ();stopTick();
-  // Simulated ticker only runs when there is no real audio element playing
-  ticker=setInterval(()=>{
-    if(aud&&!aud.paused)return;
-    elapsed++;
-    const t=activeGroup&&activeGroup.tracks[activeIdx];
-    if(!t){stopTick();return;}
-    document.getElementById('tCur').textContent=fmtT(elapsed);
-    document.getElementById('progFg').style.width=Math.min(100,Math.round(elapsed/t.dur*100))+'%';
-    updateMini();
-    if(elapsed>=t.dur){repeat?nextTrack():stopPlay();}
-  },1000);
-}
-function stopPlay(){
-  playing=false;document.getElementById('playIco').className='ti ti-player-play';
-  var a=document.getElementById('mainAudio');
-  if(a){a.pause();a.ontimeupdate=null;a.onended=null;a.onerror=null;}
-  aud=null;
-  stopTick();animEQ();updateMini();
-}
-function stopTick(){if(ticker){clearInterval(ticker);ticker=null;}if(eqTicker){clearInterval(eqTicker);eqTicker=null;}}
+
 function togglePlay(){
   if(!activeGroup||activeIdx<0){if(activeGroup&&activeGroup.tracks.length)play(0);return;}
-  var a=document.getElementById('mainAudio');
-  if(playing){stopPlay();}
-  else{
-    if(a&&a.src&&a.paused){a.play().catch(function(){});playing=true;document.getElementById('playIco').className='ti ti-player-pause';animEQ();}
-    else{startPlay();}
+  if(playing){
+    AUD.pause();playing=false;
+    document.getElementById('playIco').className='ti ti-player-play';
+    animEQ();
+  } else {
+    if(AUD.src&&AUD.src!==window.location.href){
+      AUD.play().then(function(){playing=true;document.getElementById('playIco').className='ti ti-player-pause';animEQ();}).catch(function(e){console.warn(e);});
+    } else {
+      play(activeIdx);
+    }
   }
 }
 function nextTrack(){if(!activeGroup)return;const l=activeGroup.tracks.length;play(shuffle?Math.floor(Math.random()*l):(activeIdx+1)%l);}
-function prevTrack(){if(!activeGroup)return;if(elapsed>4){elapsed=0;if(aud)aud.currentTime=0;return;}play((activeIdx-1+activeGroup.tracks.length)%activeGroup.tracks.length);}
+function prevTrack(){if(!activeGroup)return;if(elapsed>4){AUD.currentTime=0;return;}play((activeIdx-1+activeGroup.tracks.length)%activeGroup.tracks.length);}
 function toggleShuffle(){shuffle=!shuffle;document.getElementById('shufBtn').classList.toggle('on',shuffle);}
 function toggleRepeat(){repeat=!repeat;document.getElementById('repBtn').classList.toggle('on',repeat);}
 function seek(e){
   if(!activeGroup||activeIdx<0)return;
   const bg=document.getElementById('progBg');
   const pct=Math.max(0,Math.min(1,(e.clientX-bg.getBoundingClientRect().left)/bg.offsetWidth));
-  elapsed=Math.floor(pct*activeGroup.tracks[activeIdx].dur);
-  if(aud)aud.currentTime=elapsed;
+  if(!isNaN(AUD.duration))AUD.currentTime=pct*AUD.duration;
+  elapsed=Math.floor(pct*(activeGroup.tracks[activeIdx].dur||0));
   document.getElementById('tCur').textContent=fmtT(elapsed);
   document.getElementById('progFg').style.width=Math.round(pct*100)+'%';
 }
-function setVol(v){document.getElementById('volFill').style.width=v+'%';if(aud)aud.volume=v/100;}
+function setVol(v){document.getElementById('volFill').style.width=v+'%';AUD.volume=v/100;}
+// stopPlay and stopTick kept for compatibility
+function stopPlay(){AUD.pause();playing=false;document.getElementById('playIco').className='ti ti-player-play';clearInterval(ticker);ticker=null;animEQ();updateMini();}
+function stopTick(){clearInterval(ticker);ticker=null;clearInterval(eqTicker);eqTicker=null;}
 
 // ── SEARCH ────────────────────────────────────────────────────
 function doSearch(q){document.getElementById('srchClr').style.display=q?'block':'none';renderGroups();}
@@ -845,97 +751,77 @@ function clearSearch(){document.getElementById('searchInp').value='';document.ge
 function buildMoodPicker(){
   document.getElementById('moodRow').innerHTML=Object.entries(MOODS).map(([k,m])=>{
     const a=k===sMood;
-    return '<button class="mood-btn'+(a?' active':'')+'" style="'+(a?'background:'+m.bg+';color:'+m.color+';border-color:'+m.bc+';':'')+'" onclick="setMood(\''+k+'\',this)">'+m.label+'</button>';
+    return '<button class="mood-btn'+(a?' active':'')+'" style="'+(a?'background:'+m.bg+';color:'+m.color+';border-color:'+m.bc+';':'')+'" onclick="setMood(''+k+'',this)">'+m.label+'</button>';
   }).join('');
 }
-function setMood(k,el){
-  sMood=k;
-  document.querySelectorAll('.mood-btn').forEach(b=>{b.classList.remove('active');b.style.cssText='';});
-  const m=MOODS[k];el.classList.add('active');el.style.background=m.bg;el.style.color=m.color;el.style.borderColor=m.bc;
-}
-function setCat(c,el){
-  sCat=c;
-  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active');
-}
-function onLinkInput(){
-  document.getElementById('btnAdd').disabled=!document.getElementById('addLink').value.trim();
-  document.getElementById('fetchStatus').className='fetch-status';
-}
+function setMood(k,el){sMood=k;document.querySelectorAll('.mood-btn').forEach(b=>{b.classList.remove('active');b.style.cssText='';});const m=MOODS[k];el.classList.add('active');el.style.background=m.bg;el.style.color=m.color;el.style.borderColor=m.bc;}
+function setCat(c,el){sCat=c;document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');}
+function onLinkInput(){document.getElementById('btnAdd').disabled=!document.getElementById('addLink').value.trim();document.getElementById('fetchStatus').className='fetch-status';}
 function openSheet(){
-  document.getElementById('addLink').value='';
-  document.getElementById('addName').value='';
-  document.getElementById('fetchStatus').className='fetch-status';
-  document.getElementById('btnAdd').disabled=true;
+  document.getElementById('addLink').value='';document.getElementById('addName').value='';
+  document.getElementById('fetchStatus').className='fetch-status';document.getElementById('btnAdd').disabled=true;
   sCat='films';sMood='chill';
   document.querySelectorAll('.cat-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
-  buildMoodPicker();
-  document.getElementById('sheetOverlay').classList.add('open');
+  buildMoodPicker();document.getElementById('sheetOverlay').classList.add('open');
 }
 function closeSheet(){document.getElementById('sheetOverlay').classList.remove('open');}
 function overlayClick(e){if(e.target===document.getElementById('sheetOverlay'))closeSheet();}
-
 async function addEntry(){
   const link=document.getElementById('addLink').value.trim();
   const name=document.getElementById('addName').value.trim()||'Untitled';
   if(!link)return;
-  const btn=document.getElementById('btnAdd');
-  const st=document.getElementById('fetchStatus');
-  btn.disabled=true;
-  st.className='fetch-status loading';
-  st.innerHTML='<span class="spin"></span>Fetching tracks from OneDrive…';
+  const btn=document.getElementById('btnAdd'),st=document.getElementById('fetchStatus');
+  btn.disabled=true;st.className='fetch-status loading';st.innerHTML='<span class="spin"></span>Fetching tracks…';
   try{
     const tracks=await fetchFolder(link);
     lib[sCat].push({id:name+'_'+Date.now(),name,mood:sMood,link,tracks});
     rebuildMood();debounceSave();
-    st.className='fetch-status success';
-    st.textContent='✓ Found '+tracks.length+' track'+(tracks.length!==1?'s':'')+'. Added to '+(sCat==='films'?'Films':'Artists')+'.';
+    st.className='fetch-status success';st.textContent='✓ Found '+tracks.length+' tracks. Added to '+(sCat==='films'?'Films':'Artists')+'.';
     setTimeout(()=>{closeSheet();renderGroups();},1400);
-  }catch(err){
-    st.className='fetch-status error';
-    st.textContent=err.message||'Could not fetch. Check the link and try again.';
-    btn.disabled=false;
-  }
+  }catch(e){st.className='fetch-status error';st.textContent=e.message||'Could not fetch';btn.disabled=false;}
 }
 
-// ── CLOCK + INIT ──────────────────────────────────────────────
+// ── CLOCK ─────────────────────────────────────────────────────
 function tick(){const n=new Date();document.getElementById('clockTime').textContent=n.getHours()+':'+(n.getMinutes()+'').padStart(2,'0');}
 
+// ── LAUNCH ────────────────────────────────────────────────────
+async function launch(){
+  const scope=localStorage.getItem('bt_scope')||'';
+  if(!scope.includes('ReadWrite')){clearTokens();showSignin();return;}
+  document.getElementById('signinScreen').classList.add('hidden');
+  document.getElementById('mainApp').style.display='flex';
+  buildEQ();tick();setInterval(tick,30000);
+  setSyncStatus('syncing','Loading library…');
+  await loadLib();
+  renderGroups();
+}
+
+// ── INIT ──────────────────────────────────────────────────────
 async function init(){
-  // Handle OAuth callback
   const params=new URLSearchParams(window.location.search);
-  const code=params.get('code');
-  const state=params.get('state');
-  const savedState=localStorage.getItem('bt_state');
-  if(code&&state&&state===savedState){
+  const code=params.get('code'),state=params.get('state');
+  if(code&&state&&state===localStorage.getItem('bt_state')){
     window.history.replaceState({},'',window.location.pathname);
-    await exchangeCode(code);
-    return;
+    await exchangeCode(code);return;
   }
-  // Try existing token
-  if(loadTokens()){launch();return;}
-  // Try refresh
+  if(loadTokens()){await launch();return;}
   const refresh=localStorage.getItem('bt_refresh');
   if(refresh){
     try{
       const body=new URLSearchParams({client_id:CLIENT_ID,grant_type:'refresh_token',refresh_token:refresh,scope:SCOPES+' offline_access'});
       const r=await fetch(TOKEN_URL,{method:'POST',body});
-      const data=await r.json();
-      if(data.access_token){saveTokens(data);launch();return;}
+      const d=await r.json();
+      if(d.access_token){saveTokens(d);await launch();return;}
     }catch(e){}
   }
   showSignin();
 }
 
-init();
-
-// ── SERVICE WORKER ────────────────────────────────────────────
 if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/baithak/sw.js')
-      .catch(e => console.warn('SW registration failed:', e));
-  });
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('/baithak/sw.js').catch(e=>console.warn('SW:',e));});
 }
+
+init();
 </script>
 </body>
 </html>
