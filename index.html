@@ -336,24 +336,32 @@ function loadLib(){
 
 // ── ONEDRIVE FETCH ───────────────────────────────────────────
 async function fetchFolder(link){
-  // Microsoft Graph API — supports CORS from any origin for public share links
-  const enc=btoa(link).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-  const url=`https://graph.microsoft.com/v1.0/shares/u!${enc}/root/children?$select=name,size,file,@microsoft.graph.downloadUrl`;
-  const res=await fetch(url,{headers:{'Accept':'application/json'}});
-  if(res.status===401||res.status===403) throw new Error('This folder is private. On OneDrive, right-click the folder → Share → change to "Anyone with the link can view" → copy that link.');
-  if(res.status===404) throw new Error('Folder not found. Make sure the link is correct and the folder still exists.');
-  if(!res.ok) throw new Error('Could not reach OneDrive (HTTP '+res.status+'). Check your internet connection and try again.');
+  if(!link.includes("1drv.ms")&&!link.includes("onedrive.live.com")&&!link.includes("sharepoint.com"))
+    throw new Error("This does not look like a OneDrive link. Copy the share link directly from OneDrive.");
+  if(link.includes("1drv.ms/s/"))
+    throw new Error("This is a file link (/s/), not a folder link. Right-click the folder itself → Share → copy. The link should contain /f/ not /s/.");
+  const enc=btoa(link).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+  const url="https://graph.microsoft.com/v1.0/shares/u!"+enc+"/root/children?\$select=name,size,file,@microsoft.graph.downloadUrl";
+  const res=await fetch(url,{headers:{"Accept":"application/json"}});
+  if(res.status===401||res.status===403)
+    throw new Error("OneDrive says this folder is private. Right-click the album folder (not the parent) → Share → \"Anyone with the link can view\" → Copy link.");
+  if(res.status===404)
+    throw new Error("Folder not found. Check the link is correct and the folder exists.");
+  if(!res.ok){
+    const body=await res.text().catch(()=>"");
+    throw new Error("OneDrive error (HTTP "+res.status+"). "+body.slice(0,200));
+  }
   const data=await res.json();
   const files=(data.value||[])
     .filter(f=>f.file&&/\.(mp3|flac|m4a|aac|wav|ogg)$/i.test(f.name))
     .sort((a,b)=>a.name.localeCompare(b.name));
-  if(!files.length) throw new Error('No audio files found in this folder. Make sure the folder contains MP3 or FLAC files directly inside it (not in sub-folders).');
+  if(!files.length) throw new Error("No audio files found. Make sure MP3/FLAC files are directly inside this folder, not in sub-folders.");
   return files.map(f=>({
-    t:f.name.replace(/^\d+[\s\-_.]+/,'').replace(/\.[^.]+$/,''),
-    a:'',
+    t:f.name.replace(/^\d+[\s\-_.]+/,"").replace(/\.[^.]+$/,""),
+    a:"",
     dur:f.size?Math.round(f.size/32000):200,
-    fmt:f.name.split('.').pop().toUpperCase(),
-    url:f['@microsoft.graph.downloadUrl']||null,
+    fmt:f.name.split(".").pop().toUpperCase(),
+    url:f["@microsoft.graph.downloadUrl"]||null,
   }));
 }
 
