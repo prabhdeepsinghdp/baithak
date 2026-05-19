@@ -521,9 +521,13 @@ async function fetchFolder(link){
 }
 
 // Fetch a fresh, non-expired download URL for a file by its Graph item ID
-async function getDownloadUrl(itemId){
+async function getStreamUrl(itemId){
+  // Fetch a fresh downloadUrl via Graph — same approach as cinema app
+  // downloadUrl supports range requests so browser streams it natively, no buffering wait
   const data=await gFetch(GRAPH+'/me/drive/items/'+itemId+'?$select=@microsoft.graph.downloadUrl,id');
-  return data['@microsoft.graph.downloadUrl']||null;
+  const url=data['@microsoft.graph.downloadUrl'];
+  if(!url) throw new Error('No download URL returned');
+  return url;
 }
 
 // ── MOODS ─────────────────────────────────────────────────────
@@ -726,12 +730,18 @@ async function play(idx){
   // Fetch a fresh download URL using the stored item ID
   if(t.itemId){
     try{
-      const url=await getDownloadUrl(t.itemId);
-      if(!url)return;
+      setSyncStatus('syncing','Loading…');
+      const streamUrl=await getStreamUrl(t.itemId);
       if(aud){aud.pause();aud=null;}
-      aud=new Audio(url);
+      aud=new Audio();
       aud.volume=document.getElementById('volR').value/100;
-      aud.play().catch(e=>console.warn('Audio play failed:',e));
+      aud.src=streamUrl;  // set src directly — browser streams with range requests, instant start
+      aud.load();
+      // On iOS a user gesture is required — play() on load event satisfies it
+      aud.addEventListener('canplay',()=>{
+        aud.play().catch(e=>console.warn('play()failed:',e));
+        setSyncStatus('synced','Playing');
+      },{once:true});
       aud.addEventListener('timeupdate',()=>{
         if(!aud)return;
         elapsed=Math.floor(aud.currentTime);
@@ -740,7 +750,14 @@ async function play(idx){
         updateMini();
       });
       aud.addEventListener('ended',()=>{repeat?nextTrack():stopPlay();});
-    }catch(e){console.warn('Could not fetch audio URL:',e);}
+      aud.addEventListener('error',e=>{
+        setSyncStatus('error','Audio error — check console');
+        console.warn('Audio element error:',aud.error);
+      });
+    }catch(e){
+      setSyncStatus('error','Could not load audio');
+      console.warn('Audio error:',e);
+    }
   }
 }
 function startPlay(){
@@ -759,12 +776,13 @@ function startPlay(){
 }
 function stopPlay(){
   playing=false;document.getElementById('playIco').className='ti ti-player-play';
-  if(aud)aud.pause();stopTick();animEQ();updateMini();
+  if(aud){aud.pause();aud=null;}
+  stopTick();animEQ();updateMini();
 }
 function stopTick(){if(ticker){clearInterval(ticker);ticker=null;}if(eqTicker){clearInterval(eqTicker);eqTicker=null;}}
 function togglePlay(){
   if(!activeGroup||activeIdx<0){if(activeGroup&&activeGroup.tracks.length)play(0);return;}
-  playing?stopPlay():(aud&&aud.play().catch(()=>{}),startPlay());
+  playing?stopPlay():(aud&&aud.paused&&aud.play().catch(()=>{}),startPlay());
 }
 function nextTrack(){if(!activeGroup)return;const l=activeGroup.tracks.length;play(shuffle?Math.floor(Math.random()*l):(activeIdx+1)%l);}
 function prevTrack(){if(!activeGroup)return;if(elapsed>4){elapsed=0;if(aud)aud.currentTime=0;return;}play((activeIdx-1+activeGroup.tracks.length)%activeGroup.tracks.length);}
