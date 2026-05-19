@@ -739,55 +739,58 @@ async function play(idx){
   document.getElementById('tCur').textContent='0:00';
   document.getElementById('progFg').style.width='0%';
   document.getElementById('npMood').innerHTML='<div class="mood-pill" style="background:'+m.bg+';color:'+m.color+';border-color:'+m.bc+'"><i class="ti ti-circle-dot" style="font-size:10px;"></i>'+m.label+'</div>';
-  renderTL();startPlay();
-  // Fetch a fresh download URL using the stored item ID
+  renderTL();
+  // UI state — show playing immediately
+  playing=true;
+  document.getElementById('playIco').className='ti ti-player-pause';
+  animEQ();
+  stopTick();
+  // Fetch stream URL then play
   if(t.itemId){
-    try{
-      setSyncStatus('syncing','Loading…');
-      const streamUrl=await getStreamUrl(t.itemId, t.fileName, activeGroup.link);
-      // Use the persistent DOM <audio> element — same pattern as cinema app's <video>
-      // This avoids CORS preflight that dynamically created Audio() objects trigger
-      aud=document.getElementById('mainAudio');
-      aud.pause();
-      aud.removeAttribute('src');
-      aud.load();
-      aud.volume=document.getElementById('volR').value/100;
-      aud.src=streamUrl;
-      aud.load();
-      // Remove old listeners by cloning
-      const fresh=aud.cloneNode(false);
-      aud.parentNode.replaceChild(fresh,aud);
-      aud=fresh;
-      aud.src=streamUrl;
-      aud.volume=document.getElementById('volR').value/100;
-      aud.addEventListener('canplay',()=>{
-        aud.play().catch(e=>console.warn('play failed:',e));
-        setSyncStatus('synced','Playing');
-      },{once:true});
-      aud.addEventListener('timeupdate',()=>{
-        if(!aud||isNaN(aud.duration))return;
-        elapsed=Math.floor(aud.currentTime);
-        document.getElementById('tCur').textContent=fmtT(elapsed);
-        document.getElementById('progFg').style.width=Math.min(100,Math.round(aud.currentTime/aud.duration*100))+'%';
-        updateMini();
+    setSyncStatus('syncing','Loading…');
+    getStreamUrl(t.itemId, t.fileName, activeGroup.link)
+      .then(function(url){
+        setSyncStatus('synced','Streaming');
+        console.log('Got stream URL, setting audio src');
+        var a=document.getElementById('mainAudio');
+        a.pause();
+        a.src=url;
+        a.volume=document.getElementById('volR').value/100;
+        var p=a.play();
+        if(p) p.then(function(){
+          console.log('Audio playing OK');
+        }).catch(function(e){
+          console.warn('play() rejected:',e);
+          setSyncStatus('error','Tap play to start');
+        });
+        a.ontimeupdate=function(){
+          if(isNaN(a.duration))return;
+          elapsed=Math.floor(a.currentTime);
+          document.getElementById('tCur').textContent=fmtT(elapsed);
+          document.getElementById('progFg').style.width=Math.min(100,Math.round(a.currentTime/a.duration*100))+'%';
+          updateMini();
+        };
+        a.onended=function(){repeat?nextTrack():stopPlay();};
+        a.onerror=function(){
+          var c=a.error?a.error.code:'?';
+          var msg=a.error?a.error.message:'unknown';
+          console.error('Audio element error — code:',c,'message:',msg,'src:',a.src.slice(0,80));
+          setSyncStatus('error','Audio error '+c+' — see console');
+        };
+        aud=a;
+      })
+      .catch(function(e){
+        console.error('getStreamUrl failed:',e);
+        setSyncStatus('error','Could not get stream URL');
       });
-      aud.addEventListener('ended',()=>{repeat?nextTrack():stopPlay();});
-      aud.addEventListener('error',()=>{
-        console.warn('Audio error code:',aud.error&&aud.error.code,'msg:',aud.error&&aud.error.message);
-        setSyncStatus('error','Could not play — check OneDrive link permissions');
-      });
-      aud.load();
-    }catch(e){
-      setSyncStatus('error','Could not load audio');
-      console.warn('Audio fetch error:',e);
-    }
   }
 }
 function startPlay(){
   playing=true;document.getElementById('playIco').className='ti ti-player-pause';
   animEQ();stopTick();
+  // Simulated ticker only runs when there is no real audio element playing
   ticker=setInterval(()=>{
-    if(aud)return;
+    if(aud&&!aud.paused)return;
     elapsed++;
     const t=activeGroup&&activeGroup.tracks[activeIdx];
     if(!t){stopTick();return;}
@@ -799,13 +802,20 @@ function startPlay(){
 }
 function stopPlay(){
   playing=false;document.getElementById('playIco').className='ti ti-player-play';
-  if(aud){aud.pause();}
+  var a=document.getElementById('mainAudio');
+  if(a){a.pause();a.ontimeupdate=null;a.onended=null;a.onerror=null;}
+  aud=null;
   stopTick();animEQ();updateMini();
 }
 function stopTick(){if(ticker){clearInterval(ticker);ticker=null;}if(eqTicker){clearInterval(eqTicker);eqTicker=null;}}
 function togglePlay(){
   if(!activeGroup||activeIdx<0){if(activeGroup&&activeGroup.tracks.length)play(0);return;}
-  playing?stopPlay():(aud&&aud.src&&aud.paused?aud.play().catch(()=>{}):null,startPlay());
+  var a=document.getElementById('mainAudio');
+  if(playing){stopPlay();}
+  else{
+    if(a&&a.src&&a.paused){a.play().catch(function(){});playing=true;document.getElementById('playIco').className='ti ti-player-pause';animEQ();}
+    else{startPlay();}
+  }
 }
 function nextTrack(){if(!activeGroup)return;const l=activeGroup.tracks.length;play(shuffle?Math.floor(Math.random()*l):(activeIdx+1)%l);}
 function prevTrack(){if(!activeGroup)return;if(elapsed>4){elapsed=0;if(aud)aud.currentTime=0;return;}play((activeIdx-1+activeGroup.tracks.length)%activeGroup.tracks.length);}
