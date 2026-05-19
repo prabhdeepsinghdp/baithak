@@ -524,21 +524,17 @@ async function fetchFolder(link){
 }
 
 // Resolve a fresh streaming URL — mirrors cinema app's /shares/driveItem approach
-async function getStreamUrl(itemId, fileName, folderLink){
-  // Primary: resolve file through its parent folder share link (same as cinema app)
-  if(folderLink && fileName){
-    try{
-      const enc=btoa(folderLink).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-      const data=await gFetch(GRAPH+'/shares/u!'+enc+'/root:/'+encodeURIComponent(fileName)+':/driveItem');
-      const url=data['@microsoft.graph.downloadUrl'];
-      if(url) return url;
-    }catch(e){console.warn('folder resolve failed, falling back to itemId:',e);}
-  }
-  // Fallback: resolve directly via item ID
-  const data=await gFetch(GRAPH+'/me/drive/items/'+itemId+'?$select=@microsoft.graph.downloadUrl,id');
-  const url=data['@microsoft.graph.downloadUrl'];
-  if(!url) throw new Error('No download URL');
-  return url;
+async function getStreamUrl(itemId){
+  // /me/drive/items/{id}/content redirects to the CDN download URL.
+  // We fetch it with redirect:'follow' to get the final URL, then use that as audio src.
+  await refreshToken();
+  const r=await fetch(GRAPH+'/me/drive/items/'+itemId+'/content',{
+    headers:{Authorization:'Bearer '+accessToken},
+    redirect:'follow'
+  });
+  if(!r.ok) throw new Error('Content fetch failed: '+r.status);
+  // r.url is the final redirected CDN URL — no auth needed, streamable directly
+  return r.url;
 }
 
 
@@ -748,7 +744,7 @@ async function play(idx){
   // Fetch stream URL then play
   if(t.itemId){
     setSyncStatus('syncing','Loading…');
-    getStreamUrl(t.itemId, t.fileName, activeGroup.link)
+    getStreamUrl(t.itemId)
       .then(function(url){
         setSyncStatus('synced','Streaming');
         console.log('Got stream URL, setting audio src');
