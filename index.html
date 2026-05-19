@@ -525,16 +525,25 @@ async function fetchFolder(link){
 
 // Resolve a fresh streaming URL — mirrors cinema app's /shares/driveItem approach
 async function getStreamUrl(itemId){
-  // /me/drive/items/{id}/content redirects to the CDN download URL.
-  // We fetch it with redirect:'follow' to get the final URL, then use that as audio src.
   await refreshToken();
+  // Step 1: Ask Graph for the downloadUrl via driveItem metadata
+  // This is the most reliable way — returns a pre-signed CDN URL good for ~1hr
+  const meta=await fetch(GRAPH+'/me/drive/items/'+itemId+'?$select=id,@microsoft.graph.downloadUrl',{
+    headers:{Authorization:'Bearer '+accessToken}
+  });
+  if(!meta.ok) throw new Error('Meta fetch failed: '+meta.status);
+  const data=await meta.json();
+  const url=data['@microsoft.graph.downloadUrl'];
+  if(url){console.log('Got downloadUrl via meta');return url;}
+  // Step 2: fallback — try /content with manual redirect to grab Location header
   const r=await fetch(GRAPH+'/me/drive/items/'+itemId+'/content',{
     headers:{Authorization:'Bearer '+accessToken},
-    redirect:'follow'
+    redirect:'manual'
   });
-  if(!r.ok) throw new Error('Content fetch failed: '+r.status);
-  // r.url is the final redirected CDN URL — no auth needed, streamable directly
-  return r.url;
+  // 302 redirect — Location header has the CDN URL
+  const loc=r.headers.get('Location');
+  if(loc){console.log('Got URL via redirect Location');return loc;}
+  throw new Error('Could not resolve stream URL');
 }
 
 
