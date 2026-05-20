@@ -643,8 +643,8 @@ function renderGroups(){
   gl.innerHTML=list.map(g=>{
     const m=MOODS[g.mood]||MOODS.chill;
     const isA=activeGroup&&activeGroup.id===g.id;
-    const del=tab!=='mood'?'<button class="gcard-del" onclick="event.stopPropagation();del(''+g.id+'')" aria-label="Remove"><i class="ti ti-trash"></i></button>':'';
-    return '<div class="gcard'+(isA?' active-g':'')+'" onclick="openGroup(''+g.id+'')">'+'<div class="gcard-dot" style="background:'+m.color+'"></div>'+'<div class="gcard-info"><div class="gcard-name">'+g.name+'</div><div class="gcard-meta">'+g.tracks.length+' tracks · <span style="color:'+m.color+'">'+m.label+'</span></div></div>'+del+'<i class="ti ti-chevron-right gcard-arrow"></i></div>';
+    const del=tab!=='mood'?'<button class="gcard-del" onclick="event.stopPropagation();del(\''+g.id+'\')" aria-label="Remove"><i class="ti ti-trash"></i></button>':'';
+    return '<div class="gcard'+(isA?' active-g':'')+'" onclick="openGroup(\''+g.id+'\')">'+'<div class="gcard-dot" style="background:'+m.color+'"></div>'+'<div class="gcard-info"><div class="gcard-name">'+g.name+'</div><div class="gcard-meta">'+g.tracks.length+' tracks · <span style="color:'+m.color+'">'+m.label+'</span></div></div>'+del+'<i class="ti ti-chevron-right gcard-arrow"></i></div>';
   }).join('');
 }
 function del(id){lib.films=lib.films.filter(g=>g.id!==id);lib.artists=lib.artists.filter(g=>g.id!==id);if(activeGroup&&activeGroup.id===id){activeGroup=null;activeIdx=-1;}rebuildMood();debounceSave();renderGroups();}
@@ -802,7 +802,7 @@ function clearSearch(){document.getElementById('searchInp').value='';document.ge
 function buildMoodPicker(){
   document.getElementById('moodRow').innerHTML=Object.entries(MOODS).map(([k,m])=>{
     const a=k===sMood;
-    return '<button class="mood-btn'+(a?' active':'')+'" style="'+(a?'background:'+m.bg+';color:'+m.color+';border-color:'+m.bc+';':'')+'" onclick="setMood(''+k+'',this)">'+m.label+'</button>';
+    return '<button class="mood-btn'+(a?' active':'')+'" style="'+(a?'background:'+m.bg+';color:'+m.color+';border-color:'+m.bc+';':'')+'" onclick="setMood(\''+k+'\',this)">'+m.label+'</button>';
   }).join('');
 }
 function setMood(k,el){sMood=k;document.querySelectorAll('.mood-btn').forEach(b=>{b.classList.remove('active');b.style.cssText='';});const m=MOODS[k];el.classList.add('active');el.style.background=m.bg;el.style.color=m.color;el.style.borderColor=m.bc;}
