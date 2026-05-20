@@ -454,19 +454,43 @@ async function gFetch(url){
 
 // ── STREAM URL ────────────────────────────────────────────────
 // Get a playable CDN URL for an item. Uses the same approach as cinema app.
-async function getStreamUrl(itemId){
+async function getStreamUrl(track){
+  // EXACTLY mirrors cinema app's video URL resolution:
+  // /shares/u!{encoded-share-link}/driveItem returns object with @microsoft.graph.downloadUrl
+  // No $select — that filters OUT the field on personal OneDrive accounts.
   await refreshToken();
-  // Request the downloadUrl field — this is a pre-signed CDN URL, no auth needed to stream
-  const r=await fetch(GRAPH+'/me/drive/items/'+itemId+'?$select=id,name,@microsoft.graph.downloadUrl',{
-    headers:{Authorization:'Bearer '+accessToken}
-  });
-  if(!r.ok)throw new Error('Graph items request failed: '+r.status);
-  const d=await r.json();
-  console.log('Graph response keys:',Object.keys(d));
-  const url=d['@microsoft.graph.downloadUrl'];
-  console.log('downloadUrl present:',!!url, url?url.slice(0,60):'none');
-  if(!url)throw new Error('No downloadUrl in response');
-  return url;
+
+  // PREFERRED: use the per-file share link if we have one
+  if(track.link){
+    const enc=btoa(track.link).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    const r=await fetch(GRAPH+'/shares/u!'+enc+'/driveItem',{
+      headers:{Authorization:'Bearer '+accessToken}
+    });
+    if(r.ok){
+      const d=await r.json();
+      console.log('shares/driveItem keys:',Object.keys(d).filter(k=>k.includes('download')||k==='id'||k==='name'));
+      const url=d['@microsoft.graph.downloadUrl'];
+      if(url){console.log('OK got downloadUrl, length',url.length);return url;}
+      console.warn('shares/driveItem returned no downloadUrl');
+    }else{
+      console.warn('shares/driveItem failed:',r.status);
+    }
+  }
+
+  // FALLBACK: use /me/drive/items/{id} without $select
+  if(track.itemId){
+    const r=await fetch(GRAPH+'/me/drive/items/'+track.itemId,{
+      headers:{Authorization:'Bearer '+accessToken}
+    });
+    if(r.ok){
+      const d=await r.json();
+      console.log('items keys:',Object.keys(d).filter(k=>k.includes('download')||k==='id'));
+      const url=d['@microsoft.graph.downloadUrl'];
+      if(url){console.log('OK fallback URL, length',url.length);return url;}
+    }
+  }
+
+  throw new Error('Could not get downloadUrl');
 }
 
 // ── FOLDER SCAN ───────────────────────────────────────────────
@@ -474,18 +498,45 @@ async function fetchFolder(shareLink){
   if(!shareLink.includes('1drv.ms')&&!shareLink.includes('onedrive.live.com')&&!shareLink.includes('sharepoint.com'))
     throw new Error('Not a OneDrive link');
   const enc=btoa(shareLink).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-  const data=await gFetch(GRAPH+'/shares/u!'+enc+'/root/children?$select=name,size,id,file');
+  // Get folder contents — note we do NOT use $select for downloadUrl, request all fields
+  const data=await gFetch(GRAPH+'/shares/u!'+enc+'/root/children');
   const files=(data.value||[])
     .filter(f=>f.file&&/\.(mp3|flac|m4a|aac|wav|ogg)$/i.test(f.name))
     .sort((a,b)=>a.name.localeCompare(b.name));
   if(!files.length)throw new Error('No audio files found in this folder');
-  return files.map(f=>({
-    t:f.name.replace(/^\d+[\s\-_.]+/,'').replace(/\.[^.]+$/,''),
-    a:'',
-    dur:f.size?Math.round(f.size/32000):200,
-    fmt:f.name.split('.').pop().toUpperCase(),
-    itemId:f.id,
-  }));
+
+  // For each file, create a permanent share link — same approach as cinema app
+  // This link is then resolvable later via /shares/u!{enc}/driveItem
+  await refreshToken();
+  const tracks=[];
+  for(const f of files){
+    let trackLink=null;
+    try{
+      // Create an anonymous view link for this specific file
+      const lr=await fetch(GRAPH+'/me/drive/items/'+f.id+'/createLink',{
+        method:'POST',
+        headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+        body:JSON.stringify({type:'view',scope:'anonymous'})
+      });
+      if(lr.ok){
+        const ld=await lr.json();
+        trackLink=ld.link&&ld.link.webUrl;
+        console.log('Created link for',f.name,'->',trackLink?trackLink.slice(0,50):'none');
+      }else{
+        console.warn('createLink failed for',f.name,'status',lr.status);
+      }
+    }catch(e){console.warn('createLink error:',e);}
+
+    tracks.push({
+      t:f.name.replace(/^\d+[\s\-_.]+/,'').replace(/\.[^.]+$/,''),
+      a:'',
+      dur:f.size?Math.round(f.size/32000):200,
+      fmt:f.name.split('.').pop().toUpperCase(),
+      itemId:f.id,
+      link:trackLink,  // per-file share link, same approach as cinema app
+    });
+  }
+  return tracks;
 }
 
 // ── MOODS ─────────────────────────────────────────────────────
@@ -649,14 +700,14 @@ function play(idx){
   document.getElementById('npMood').innerHTML='<div class="mood-pill" style="background:'+m.bg+';color:'+m.color+';border-color:'+m.bc+'"><i class="ti ti-circle-dot" style="font-size:10px;"></i>'+m.label+'</div>';
   renderTL();
 
-  if(!t.itemId){
-    console.warn('Track has no itemId — delete and re-add this album');
+  if(!t.itemId&&!t.link){
+    console.warn('Track has no itemId or link — delete and re-add this album');
     setSyncStatus('error','Re-add this album to fix playback');
     return;
   }
 
   setSyncStatus('syncing','Fetching stream URL…');
-  getStreamUrl(t.itemId).then(function(url){
+  getStreamUrl(t).then(function(url){
     console.log('Stream URL OK, length='+url.length+', starts='+url.slice(0,50));
     AUD.src=url;
     AUD.volume=document.getElementById('volR').value/100;
